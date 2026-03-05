@@ -1,0 +1,14 @@
+{
+    "users": [
+        {
+            "name": "System Admin",
+            "email": "admin@college.edu",
+            "password": "$2a$10$poyYttPHnbiIi5eD7x3DluxeVeAJBfW.Tk2U4NPfCn6xTqlBwHie2",
+            "role": "admin",
+            "isActive": true,
+            "_id": "27b01a9e-f352-4e05-9e76-e41ab74013ce",
+            "createdAt": "2026-02-28T03:20:57.000Z"
+        }
+    ],
+    "projects": []
+}
