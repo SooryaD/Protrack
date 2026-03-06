@@ -12,22 +12,31 @@ const generateToken = (id, role) =>
 // @route   POST /api/auth/login
 // @access  Public
 router.post('/login', async (req, res) => {
-    const { email, password } = req.body;
+    const { email, identifier, password } = req.body;
 
-    if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required.' });
+    const loginId = identifier || email;
+
+    if (!loginId || !password) {
+        return res.status(400).json({ message: 'Roll Number or Email, and password are required.' });
     }
 
     try {
-        const user = await User.findOne({ email: email.trim().toLowerCase() });
+        const idStr = loginId.trim();
+        let user;
+
+        if (idStr.includes('@')) {
+            user = await User.findOne({ email: idStr.toLowerCase() });
+        } else {
+            user = await User.findOne({ rollNo: idStr.toUpperCase() });
+        }
 
         if (!user) {
-            return res.status(401).json({ message: 'Invalid email or password.' });
+            return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
         const isMatch = await user.matchPassword(password);
         if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid email or password.' });
+            return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
         if (user.isActive === false) {

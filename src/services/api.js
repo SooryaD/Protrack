@@ -4,9 +4,9 @@ const API = axios.create({
     baseURL: 'http://localhost:5000/api',
 });
 
-// Request interceptor — attach Bearer token from localStorage
+// Request interceptor — attach Bearer token from sessionStorage
 API.interceptors.request.use((req) => {
-    const user = localStorage.getItem('user');
+    const user = sessionStorage.getItem('user');
     if (user) {
         const { token } = JSON.parse(user);
         if (token) {
@@ -24,7 +24,7 @@ API.interceptors.response.use(
             const msg = error.response?.data?.message?.toLowerCase() || '';
             const isTokenError = msg.includes('token') || msg.includes('not authorized') || msg.includes('no token');
             if (isTokenError) {
-                localStorage.removeItem('user');
+                sessionStorage.removeItem('user');
                 if (window.location.pathname !== '/') {
                     window.location.href = '/';
                 }

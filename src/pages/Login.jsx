@@ -17,7 +17,7 @@ const generateCaptcha = () => {
 };
 
 const Login = () => {
-    const [email, setEmail] = useState('');
+    const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -41,7 +41,7 @@ const Login = () => {
         setError('');
         setCaptchaError('');
 
-        if (!email.trim()) { setError('Please enter your email.'); return; }
+        if (!identifier.trim()) { setError('Please enter your Roll Number or Email.'); return; }
         if (!password) { setError('Please enter your password.'); return; }
 
         // Validate CAPTCHA
@@ -56,7 +56,7 @@ const Login = () => {
         }
 
         setLoading(true);
-        const result = await login({ email: email.trim() }, password);
+        const result = await login({ identifier: identifier.trim() }, password);
         setLoading(false);
 
         if (result.success) {
@@ -112,16 +112,16 @@ const Login = () => {
                     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-main)' }}>
-                                Email Address
+                                Roll Number / Email Address
                             </label>
                             <input
                                 className="saas-input"
-                                type="email"
-                                id="email"
-                                value={email}
-                                onChange={e => setEmail(e.target.value)}
-                                placeholder="name@college.edu"
-                                autoComplete="email"
+                                type="text"
+                                id="identifier"
+                                value={identifier}
+                                onChange={e => setIdentifier(e.target.value)}
+                                placeholder="26MCA0001 or name@college.edu"
+                                autoComplete="username"
                                 autoFocus
                             />
                         </div>

@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
 import User from './models/User.js';
 import StudentRegistry from './models/StudentRegistry.js';
+import Project from './models/Project.js';
+import GuideRequest from './models/GuideRequest.js';
 import connectDB from './db.js';
 
 dotenv.config();
@@ -11,6 +13,8 @@ const importData = async () => {
         // ── Clear existing data ──────────────────────────────────────
         await User.deleteMany();
         await StudentRegistry.deleteMany();
+        await Project.deleteMany();
+        await GuideRequest.deleteMany();
 
         // ── 1. Admin ─────────────────────────────────────────────────
         await User.create({

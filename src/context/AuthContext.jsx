@@ -8,10 +8,10 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // On mount, attempt to restore session from localStorage token
+    // On mount, attempt to restore session from sessionStorage token
     useEffect(() => {
         const restoreSession = async () => {
-            const storedUser = localStorage.getItem('user');
+            const storedUser = sessionStorage.getItem('user');
             if (!storedUser) {
                 setLoading(false);
                 return;
@@ -21,13 +21,13 @@ export const AuthProvider = ({ children }) => {
             try {
                 stored = JSON.parse(storedUser);
             } catch {
-                localStorage.removeItem('user');
+                sessionStorage.removeItem('user');
                 setLoading(false);
                 return;
             }
 
             if (!stored?.token) {
-                localStorage.removeItem('user');
+                sessionStorage.removeItem('user');
                 setLoading(false);
                 return;
             }
@@ -42,11 +42,11 @@ export const AuthProvider = ({ children }) => {
                 // Normalise id field and merge token back in
                 const restoredUser = { ...data, id: data.id || data._id, token: stored.token };
                 setUser(restoredUser);
-                // Keep localStorage in sync with fresh server data
-                localStorage.setItem('user', JSON.stringify(restoredUser));
+                // Keep sessionStorage in sync with fresh server data
+                sessionStorage.setItem('user', JSON.stringify(restoredUser));
             } catch {
                 // Token invalid or expired — clear session silently
-                localStorage.removeItem('user');
+                sessionStorage.removeItem('user');
                 setUser(null);
             } finally {
                 setLoading(false);
@@ -62,7 +62,7 @@ export const AuthProvider = ({ children }) => {
             const { data } = await API.post('/auth/login', { ...credentials, password });
             const userData = { ...data, id: data._id || data.id };
             setUser(userData);
-            localStorage.setItem('user', JSON.stringify(userData));
+            sessionStorage.setItem('user', JSON.stringify(userData));
             return { success: true, user: userData };
         } catch (error) {
             return {
@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }) => {
 
     const logout = () => {
         setUser(null);
-        localStorage.removeItem('user');
+        sessionStorage.removeItem('user');
     };
 
     return (
