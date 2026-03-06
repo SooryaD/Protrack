@@ -17,6 +17,7 @@ const AdminDashboard = () => {
     const [formMessage, setFormMessage] = useState(null);
     const [submitting, setSubmitting] = useState(false);
     const [cscComments, setCscComments] = useState({});
+    const [capacities, setCapacities] = useState({});
 
     useEffect(() => { loadData(); }, [activeTab]);
 
@@ -29,7 +30,14 @@ const AdminDashboard = () => {
         setStats(statsData);
         setUsers(usersData);
         setProjects(projectsData);
-        setStaffList(usersData.filter(u => u.role === 'staff' && u.isActive !== false));
+        const staff = usersData.filter(u => u.role === 'staff' && u.isActive !== false);
+        setStaffList(staff);
+
+        const caps = {};
+        staff.forEach(s => {
+            caps[s.id || s._id] = s.maxStudents ?? 2;
+        });
+        setCapacities(caps);
     };
 
     const validateForm = () => {
@@ -85,6 +93,18 @@ const AdminDashboard = () => {
         else alert('CSC Review Failed: ' + res.error);
     };
 
+    const handleSaveCapacity = async (staffId) => {
+        const val = parseInt(capacities[staffId]);
+        if (isNaN(val) || val < 0) return alert('Invalid capacity.');
+        const res = await ProjectService.setStaffCapacity(staffId, val);
+        if (res.success) {
+            alert('Capacity updated successfully.');
+            loadData();
+        } else {
+            alert('Failed to update capacity: ' + res.error);
+        }
+    };
+
     const getStatusBadge = (status) => {
         const config = {
             'TITLE_PENDING': { color: 'var(--warning)', bg: '#FEF3C7', label: 'IN REVIEW' },
@@ -129,6 +149,45 @@ const AdminDashboard = () => {
 
     const pendingCsc = projects.filter(p => p.status === 'TITLE_APPROVED');
     const reviewedCsc = projects.filter(p => p.cscStatus && !['TITLE_APPROVED'].includes(p.status) && ['CSC_APPROVED', 'CSC_SCOPE_MODIFICATION', 'CSC_NOT_APPROVED'].includes(p.cscStatus));
+
+    const staffAdmins = users.filter(u => u.role === 'admin' || u.role === 'staff');
+    const studentUsers = users.filter(u => u.role === 'student');
+
+    const renderUserCard = (u) => (
+        <div key={u.id || u._id} className="hover-scale" style={{ padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', border: '1px solid var(--border-color)', transition: 'var(--transition)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: u.role === 'admin' ? '#F3E8FF' : u.role === 'staff' ? '#EFF6FF' : '#F1F5F9', color: u.role === 'admin' ? '#8B5CF6' : u.role === 'staff' ? 'var(--primary)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.85rem', flexShrink: 0 }}>
+                    {u.name?.charAt(0)}
+                </div>
+                <div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.9rem' }}>{u.name}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                        {u.email}
+                        <div style={{ marginTop: '0.2rem' }}>
+                            <span style={{ textTransform: 'capitalize', color: u.role === 'admin' ? '#8B5CF6' : u.role === 'staff' ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 500 }}>{u.role}</span>
+                            {u.role === 'student' && u.assignedGuideName && <span style={{ marginLeft: '0.4rem', color: 'var(--text-muted)' }}>· Guide: <span style={{ fontWeight: 500, color: 'var(--primary)' }}>{u.assignedGuideName}</span></span>}
+                        </div>
+                        {u.role === 'staff' && (
+                            <div style={{ marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>Capacity: {(u.currentStudentCount || 0)}/</span>
+                                <input
+                                    type="number" min={0} value={capacities[u.id || u._id] || 0}
+                                    onChange={(e) => setCapacities({ ...capacities, [u.id || u._id]: e.target.value })}
+                                    style={{ width: '45px', padding: '0.15rem 0.25rem', fontSize: '0.75rem', border: '1px solid var(--border-color)', borderRadius: '3px' }}
+                                />
+                                <button onClick={() => handleSaveCapacity(u.id || u._id)} style={{ padding: '0.2rem 0.4rem', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '3px', fontSize: '0.65rem', cursor: 'pointer' }}>Save</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+            {u.role !== 'admin' && (
+                <button onClick={() => handleDeleteUser(u.id || u._id)} style={{ padding: '0.4rem', background: '#FEE2E2', color: 'var(--danger)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Trash2 size={14} />
+                </button>
+            )}
+        </div>
+    );
 
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem 4rem' }}>
@@ -314,31 +373,21 @@ const AdminDashboard = () => {
                     </div>
 
 
-                    <div className="saas-card" style={{ padding: '1.5rem' }}>
-                        <h3 style={{ fontSize: '1.1rem', marginBottom: '1.5rem' }}>System Users <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 400, marginLeft: '0.5rem' }}>({users.length})</span></h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            {users.map(u => (
-                                <div key={u.id || u._id} className="hover-scale" style={{ padding: '1rem 1.25rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', border: '1px solid var(--border-color)', transition: 'var(--transition)' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: u.role === 'admin' ? '#F3E8FF' : u.role === 'staff' ? '#EFF6FF' : '#F1F5F9', color: u.role === 'admin' ? '#8B5CF6' : u.role === 'staff' ? 'var(--primary)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>
-                                            {u.name?.charAt(0)}
-                                        </div>
-                                        <div>
-                                            <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{u.name}</div>
-                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
-                                                {u.email} <span style={{ margin: '0 0.5rem', color: 'var(--border-color)' }}>|</span>
-                                                <span style={{ textTransform: 'capitalize', color: u.role === 'admin' ? '#8B5CF6' : u.role === 'staff' ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 500 }}>{u.role}</span>
-                                                {u.role === 'student' && u.assignedGuideName && <span style={{ marginLeft: '0.4rem', color: 'var(--text-muted)' }}>· Guide: <span style={{ fontWeight: 500, color: 'var(--primary)' }}>{u.assignedGuideName}</span></span>}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {u.role !== 'admin' && (
-                                        <button onClick={() => handleDeleteUser(u.id || u._id)} style={{ padding: '0.5rem', background: '#FEE2E2', color: 'var(--danger)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <Trash2 size={16} />
-                                        </button>
-                                    )}
-                                </div>
-                            ))}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                        <div className="saas-card" style={{ padding: '1.5rem' }}>
+                            <h3 style={{ fontSize: '1.05rem', marginBottom: '1.25rem' }}>Staff & Admin <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 400, marginLeft: '0.3rem' }}>({staffAdmins.length})</span></h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '600px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                                {staffAdmins.map(u => renderUserCard(u))}
+                                {staffAdmins.length === 0 && <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>No staff or admins.</div>}
+                            </div>
+                        </div>
+
+                        <div className="saas-card" style={{ padding: '1.5rem' }}>
+                            <h3 style={{ fontSize: '1.05rem', marginBottom: '1.25rem' }}>Students <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 400, marginLeft: '0.3rem' }}>({studentUsers.length})</span></h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '600px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                                {studentUsers.map(u => renderUserCard(u))}
+                                {studentUsers.length === 0 && <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>No students.</div>}
+                            </div>
                         </div>
                     </div>
                 </div>

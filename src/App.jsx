@@ -8,6 +8,7 @@ import StudentDashboard from './pages/StudentDashboard';
 import StaffDashboard from './pages/StaffDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import ForgotPassword from './pages/ForgotPassword';
+import Signup from './pages/Signup';
 
 // Full-screen loading spinner shown while session is being validated
 const LoadingScreen = () => (
@@ -34,7 +35,7 @@ const ProtectedRoute = ({ children, allowedRole }) => {
 };
 
 // Public pages (no sidebar/navbar)
-const PUBLIC_PATHS = ['/', '/forgot-password'];
+const PUBLIC_PATHS = ['/', '/forgot-password', '/signup'];
 
 const AppContent = () => {
   const location = useLocation();
@@ -49,6 +50,7 @@ const AppContent = () => {
     return (
       <Routes>
         <Route path="/" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
       </Routes>
     );
