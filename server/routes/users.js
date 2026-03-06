@@ -10,7 +10,14 @@ router.get('/staff', protect, async (req, res) => {
         const users = await User.find({});
         const staffUsers = users
             .filter(u => u.role === 'staff' && u.isActive !== false)
-            .map(u => ({ _id: u._id, id: u._id, name: u.name, email: u.email, role: u.role }));
+            .map(u => ({
+                _id: u._id, id: u._id,
+                name: u.name,
+                email: u.email,
+                role: u.role,
+                maxStudents: u.maxStudents ?? 2,
+                currentStudentCount: u.currentStudentCount ?? 0
+            }));
         res.json(staffUsers);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -27,6 +34,8 @@ router.get('/', protect, adminOnly, async (req, res) => {
             isActive: u.isActive,
             assignedGuideId: u.assignedGuideId || null,
             assignedGuideName: u.assignedGuideName || null,
+            maxStudents: u.maxStudents ?? 2,
+            currentStudentCount: u.currentStudentCount ?? 0,
             createdAt: u.createdAt,
         })));
     } catch (err) {
@@ -88,6 +97,28 @@ router.delete('/:id', protect, adminOnly, async (req, res) => {
         if (user.role === 'admin') return res.status(403).json({ message: 'Cannot delete an admin account.' });
         await user.deleteOne();
         res.json({ message: 'User removed.' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// @route   PUT /api/users/:id/capacity  — Admin sets staff capacity
+router.put('/:id/capacity', protect, adminOnly, async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user || user.role !== 'staff') {
+            return res.status(404).json({ message: 'Staff member not found.' });
+        }
+
+        const { maxStudents } = req.body;
+        if (typeof maxStudents !== 'number' || maxStudents < 0) {
+            return res.status(400).json({ message: 'Valid maxStudents number is required.' });
+        }
+
+        user.maxStudents = maxStudents;
+        await user.save();
+
+        res.json({ message: 'Capacity updated.', maxStudents: user.maxStudents });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

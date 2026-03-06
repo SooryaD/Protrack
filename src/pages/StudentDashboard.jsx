@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ProjectService } from '../services/storage';
-import { FileText, Send, CheckCircle, Code, AlertCircle, Briefcase, Plus, ArrowLeft, Star, Award, Download, CalendarDays } from 'lucide-react';
+import { FileText, Send, CheckCircle, Code, AlertCircle, Briefcase, Plus, ArrowLeft, Star, Award, Download, CalendarDays, Clock, XCircle } from 'lucide-react';
 
 const PROJECT_DOMAINS = [
     'System Software / Tools Development',
@@ -88,10 +88,25 @@ const StudentDashboard = () => {
     const [formData, setFormData] = useState({ title: '', domain: '', techStack: '', abstract: '', guideId: '', guideName: '' });
     const [activeTab, setActiveTab] = useState('details');
     const [formError, setFormError] = useState('');
+    const [myRequest, setMyRequest] = useState(null);
 
     useEffect(() => {
-        if (user) { loadProposals(); loadGuides(); }
+        if (user) {
+            if (user.assignedGuideId) {
+                loadProposals();
+                loadGuides();
+            } else {
+                loadGuidesAndRequest();
+            }
+        }
     }, [user, view]);
+
+    const loadGuidesAndRequest = async () => {
+        const req = await ProjectService.getMyGuideRequest();
+        if (req.success) setMyRequest(req.data);
+        const g = await ProjectService.getStaffUsers();
+        setGuides(g);
+    };
 
     const loadProposals = async () => {
         const data = await ProjectService.getStudentProposals(user.id);
@@ -108,7 +123,14 @@ const StudentDashboard = () => {
         if (proposals.some(p => !['TITLE_REJECTED', 'CSC_NOT_APPROVED'].includes(p.status))) {
             alert('You already have an active project.'); return;
         }
-        setFormData({ title: '', domain: '', techStack: '', abstract: '', guideId: '', guideName: '' });
+        setFormData({
+            title: '',
+            domain: '',
+            techStack: '',
+            abstract: '',
+            guideId: user?.assignedGuideId || '',
+            guideName: user?.assignedGuideName || ''
+        });
         setSelectedProject(null); setFormError(''); setView('create');
     };
 
@@ -133,15 +155,29 @@ const StudentDashboard = () => {
         setFormError('');
         const wordCount = formData.title.trim().split(/\s+/).filter(Boolean).length;
         if (wordCount < 7) { setFormError('Project title must contain at least 7 words.'); return; }
-        if (!selectedProject && !formData.guideId) { setFormError('Please select a project guide.'); return; }
-        const payload = selectedProject ? { ...formData, id: selectedProject.id } : formData;
+
+        const finalGuideId = formData.guideId || user?.assignedGuideId;
+        if (!selectedProject && !finalGuideId) { setFormError('Please select a project guide.'); return; }
+
+        const payload = selectedProject ? { ...formData, id: selectedProject.id } : { ...formData, guideId: finalGuideId, guideName: formData.guideName || user?.assignedGuideName };
         const response = await ProjectService.submitProposal(user.id, user.name, payload);
+
         if (response.success) {
             loadProposals();
             if (!selectedProject) setView('list');
             else setSelectedProject(response.data);
         } else {
             setFormError(response.error);
+        }
+    };
+
+    const handleRequestGuide = async (staffId) => {
+        if (!window.confirm('Send a request to this guide?')) return;
+        const res = await ProjectService.sendGuideRequest(staffId);
+        if (res.success) {
+            loadGuidesAndRequest();
+        } else {
+            alert(res.error);
         }
     };
 
@@ -186,6 +222,88 @@ const StudentDashboard = () => {
             </div>
         );
     };
+
+    // ── SELECT GUIDE VIEW (If not assigned yet) ──────────────────
+    if (user && !user.assignedGuideId) {
+        return (
+            <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+                <div style={{ marginBottom: '2rem' }}>
+                    <h1 style={{ fontSize: '1.75rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}><Briefcase size={26} color="var(--primary)" /> Guide Selection</h1>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>You must select an available staff member to guide your project before you can submit a proposal.</p>
+                </div>
+
+                {myRequest && myRequest.status === 'pending' ? (
+                    <div className="animate-fade-in saas-card" style={{ padding: '4rem 2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
+                        <div style={{ width: '80px', height: '80px', background: '#FEF3C7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem', boxShadow: '0 4px 14px 0 rgba(217, 119, 6, 0.2)' }}>
+                            <Clock size={40} color="#D97706" />
+                        </div>
+                        <h2 style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '0.75rem' }}>Waiting for Approval</h2>
+                        <p style={{ fontSize: '1.05rem', color: 'var(--text-muted)', maxWidth: '500px', lineHeight: 1.6 }}>
+                            You have sent a request to <strong>{myRequest.staffName}</strong>. You will be able to submit your project proposal once they accept your request.
+                        </p>
+                        <div style={{ marginTop: '2rem', padding: '0.75rem 1.5rem', background: '#FFFBEB', borderRadius: 'var(--radius-full)', border: '1px solid #FDE68A', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#D97706', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}></span>
+                            <span style={{ fontSize: '0.9rem', color: '#B45309', fontWeight: 600, letterSpacing: '0.05em' }}>PENDING STAFF REVIEW</span>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        {myRequest && myRequest.status === 'rejected' && (
+                            <div style={{ padding: '1.25rem', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: 'var(--radius-md)', marginBottom: '2rem', display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+                                <XCircle size={24} color="#DC2626" style={{ marginTop: '0.2rem' }} />
+                                <div>
+                                    <h3 style={{ fontSize: '1rem', color: '#B91C1C', margin: '0 0 0.25rem 0' }}>Request Rejected</h3>
+                                    <p style={{ fontSize: '0.9rem', color: '#991B1B', margin: '0 0 0.5rem 0' }}>Your previous request to <strong>{myRequest.staffName}</strong> was rejected.</p>
+                                    <p style={{ fontSize: '0.85rem', color: '#7F1D1D', margin: 0, fontStyle: 'italic', background: 'rgba(255,255,255,0.4)', padding: '0.5rem', borderRadius: '4px' }}>Reason: {myRequest.rejectionReason}</p>
+                                    <p style={{ fontSize: '0.85rem', color: '#991B1B', marginTop: '0.5rem', fontWeight: 600 }}>You may now request a different guide.</p>
+                                </div>
+                            </div>
+                        )}
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                            {guides.map(g => {
+                                const count = g.currentStudentCount || 0;
+                                const max = g.maxStudents || 2;
+                                const isFull = count >= max;
+
+                                return (
+                                    <div key={g.id || g._id} className="saas-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', height: '100%', borderTop: isFull ? '3px solid var(--danger)' : '3px solid var(--success)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#EFF6FF', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 600 }}>{g.name?.charAt(0)}</div>
+                                                <div>
+                                                    <h3 style={{ fontSize: '1.05rem', margin: '0 0 0.2rem 0' }}>{g.name}</h3>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{g.email}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ background: '#F8FAFC', padding: '0.875rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>Capacity</span>
+                                            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: isFull ? 'var(--danger)' : 'var(--success)' }}>
+                                                {count} / {max} {isFull && <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', marginLeft: '4px', padding: '2px 6px', background: '#FEE2E2', borderRadius: '4px' }}>Full</span>}
+                                            </span>
+                                        </div>
+
+                                        <div style={{ marginTop: 'auto' }}>
+                                            <button
+                                                onClick={() => handleRequestGuide(g.id || g._id)}
+                                                disabled={isFull}
+                                                className="btn-primary"
+                                                style={{ width: '100%', padding: '0.75rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', opacity: isFull ? 0.5 : 1, cursor: isFull ? 'not-allowed' : 'pointer' }}
+                                            >
+                                                <Send size={16} /> Request Guide
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </>
+                )}
+            </div>
+        );
+    }
 
     // ── LIST VIEW ──────────────────────────────────────────────
     if (view === 'list') {
@@ -258,7 +376,7 @@ const StudentDashboard = () => {
                                 )}
                                 <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                                     <span>{p.domain}</span>
-                                    <span>Guide: {p.guideName}</span>
+                                    <span>Guide: {p.guideName || user?.assignedGuideName || 'Unassigned'}</span>
                                 </div>
                             </div>
                         ))}
@@ -286,50 +404,43 @@ const StudentDashboard = () => {
                         </div>
                     )}
 
-                    {guides.length === 0 && (
-                        <div style={{ padding: '1rem', background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: 'var(--radius-md)', color: '#DC2626', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
-                            No staff guides available. Please contact the administrator.
-                        </div>
-                    )}
-
                     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                         <div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
                                 <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>Project Title</label>
                                 <span style={{ fontSize: '0.8rem', color: wordCount >= 7 ? 'var(--success)' : '#F59E0B', fontWeight: 600 }}>{wordCount}/7 words min</span>
                             </div>
-                            <input name="title" value={formData.title} onChange={handleChange} required disabled={guides.length === 0} className="saas-input" placeholder="Enter a descriptive title with at least 7 words" />
+                            <input name="title" value={formData.title} onChange={handleChange} required className="saas-input" placeholder="Enter a descriptive title with at least 7 words" />
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                             <div>
                                 <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 500 }}>Domain / Type</label>
-                                <select name="domain" value={formData.domain} onChange={handleChange} required disabled={guides.length === 0} className="saas-input">
+                                <select name="domain" value={formData.domain} onChange={handleChange} required className="saas-input">
                                     <option value="">Select domain…</option>
                                     {PROJECT_DOMAINS.map(d => <option key={d} value={d}>{d}</option>)}
                                 </select>
                             </div>
                             <div>
                                 <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 500 }}>Tech Stack</label>
-                                <input name="techStack" value={formData.techStack} onChange={handleChange} required disabled={guides.length === 0} className="saas-input" placeholder="e.g. React, Node.js, MongoDB" />
+                                <input name="techStack" value={formData.techStack} onChange={handleChange} required className="saas-input" placeholder="e.g. React, Node.js, MongoDB" />
                             </div>
                         </div>
 
                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 500 }}>Assign Staff Guide</label>
-                            <select name="guideId" value={formData.guideId} onChange={handleChange} required disabled={guides.length === 0} className="saas-input">
-                                <option value="">Select a guide…</option>
-                                {guides.map(g => <option key={g.id} value={g.id}>{g.name} ({g.email})</option>)}
-                            </select>
+                            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 500 }}>Assigned Guide</label>
+                            <div style={{ padding: '0.875rem 1rem', background: '#F8FAFC', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: 'var(--text-main)', fontSize: '0.95rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <CheckCircle size={18} color="var(--success)" /> {user.assignedGuideName}
+                            </div>
                         </div>
 
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 500 }}>Abstract</label>
-                            <textarea name="abstract" value={formData.abstract} onChange={handleChange} required disabled={guides.length === 0} className="saas-input" rows={5} placeholder="Describe your project — existing system, proposed system, objectives…" />
+                            <textarea name="abstract" value={formData.abstract} onChange={handleChange} required className="saas-input" rows={5} placeholder="Describe your project — existing system, proposed system, objectives…" />
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            <button type="submit" disabled={guides.length === 0} className="btn-primary" style={{ padding: '0.75rem 2rem' }}>Submit Proposal</button>
+                            <button type="submit" className="btn-primary" style={{ padding: '0.75rem 2rem' }}>Submit Proposal</button>
                         </div>
                     </form>
                 </div>
@@ -403,7 +514,7 @@ const StudentDashboard = () => {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', padding: '1.25rem', background: '#F8FAFC', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                                 <div><div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Domain</div><div style={{ fontWeight: 500 }}>{selectedProject.domain}</div></div>
                                 <div><div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Tech Stack</div><div style={{ fontWeight: 500 }}>{selectedProject.techStack}</div></div>
-                                <div><div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Guide</div><div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><div style={{ width: '18px', height: '18px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem' }}>{selectedProject.guideName?.charAt(0)}</div>{selectedProject.guideName}</div></div>
+                                <div><div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Guide</div><div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><div style={{ width: '18px', height: '18px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem' }}>{(selectedProject.guideName || user?.assignedGuideName || 'U').charAt(0)}</div>{selectedProject.guideName || user?.assignedGuideName || 'Unassigned'}</div></div>
                                 <div><div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>CSC Status</div><div style={{ fontWeight: 500 }}>{selectedProject.cscStatus ? selectedProject.cscStatus.replace(/_/g, ' ') : 'Pending'}</div></div>
                             </div>
                         </div>

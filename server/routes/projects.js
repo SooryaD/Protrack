@@ -103,6 +103,7 @@ router.post('/', async (req, res) => {
             status: 'TITLE_PENDING',
             history: [{ date: new Date(), action: 'SUBMITTED', by: 'Student', comment: 'Project proposal submitted for guide approval.' }]
         });
+        if (guideName) project.guideName = guideName; // explicit
         res.status(201).json(await project.save());
     }
 });

@@ -24,7 +24,11 @@ export const protect = async (req, res, next) => {
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                rollNo: user.rollNo || null,
                 assignedGuideId: user.assignedGuideId || null,
+                assignedGuideName: user.assignedGuideName || null,
+                maxStudents: user.maxStudents || null,
+                currentStudentCount: user.currentStudentCount || 0,
                 isActive: user.isActive,
             };
 

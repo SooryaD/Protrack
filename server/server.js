@@ -7,6 +7,7 @@ import connectDB from './db.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import projectRoutes from './routes/projects.js';
+import guideRequestRoutes from './routes/guideRequests.js';
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.use('/uploads', express.static('uploads'));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/guide-requests', guideRequestRoutes);
 
 // Base Route
 app.get('/', (req, res) => {

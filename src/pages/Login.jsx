@@ -218,8 +218,14 @@ const Login = () => {
                     </form>
                 </div>
 
-                <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.8rem', color: 'var(--text-muted)', opacity: 0.8 }}>
-                    Accounts are created by the system administrator only.
+                <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    New student?{' '}
+                    <Link to="/signup" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>
+                        Create your account →
+                    </Link>
+                </p>
+                <p style={{ textAlign: 'center', marginTop: '0.4rem', fontSize: '0.78rem', color: 'var(--text-muted)', opacity: 0.7 }}>
+                    Staff accounts are created by the administrator only.
                 </p>
             </div>
         </div>
