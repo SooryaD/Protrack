@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ProjectService } from '../services/storage';
-import { FileText, Send, CheckCircle, Code, AlertCircle, Briefcase, Plus, ArrowLeft, Star, Award } from 'lucide-react';
+import { FileText, Send, CheckCircle, Code, AlertCircle, Briefcase, Plus, ArrowLeft, Star, Award, Download, CalendarDays } from 'lucide-react';
 
 const PROJECT_DOMAINS = [
     'System Software / Tools Development',
@@ -203,6 +203,34 @@ const StudentDashboard = () => {
                         </button>
                     )}
                 </div>
+
+                {/* MCA Schedule Download */}
+                <a
+                    href="/mca_schedule.pdf"
+                    download="MCA_Project_Schedule.pdf"
+                    style={{
+                        display: 'flex', alignItems: 'center', gap: '1rem',
+                        padding: '0.9rem 1.25rem', marginBottom: '1.5rem',
+                        background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.08) 100%)',
+                        border: '1px solid rgba(99,102,241,0.25)',
+                        borderRadius: 'var(--radius-md, 10px)',
+                        textDecoration: 'none', cursor: 'pointer',
+                        transition: 'box-shadow 0.2s, border-color 0.2s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(99,102,241,0.18)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.25)'; }}
+                >
+                    <div style={{ background: 'rgba(99,102,241,0.12)', padding: '0.6rem', borderRadius: '8px', display: 'flex', flexShrink: 0 }}>
+                        <CalendarDays size={20} color="var(--primary)" />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)' }}>MCA Project Schedule</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>Download the official MCA project schedule &amp; timeline (PDF)</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--primary)', flexShrink: 0 }}>
+                        <Download size={15} /> Download PDF
+                    </div>
+                </a>
 
                 {proposals.length === 0 ? (
                     <div className="saas-card" style={{ textAlign: 'center', padding: '4rem 2rem', borderStyle: 'dashed' }}>
