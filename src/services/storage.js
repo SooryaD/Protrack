@@ -33,6 +33,52 @@ export const ProjectService = {
         catch (error) { return { success: false, error: error.response?.data?.message || 'Failed to create user' }; }
     },
 
+    // Verify student roll no + phone before signup
+    verifyStudent: async (rollNo, phone) => {
+        try {
+            const { data } = await API.post('/auth/verify-student', { rollNo, phone });
+            return { success: true, ...data };
+        } catch (error) {
+            return { success: false, error: error.response?.data?.message || 'Verification failed' };
+        }
+    },
+
+    // Register a new student account after verification
+    registerStudent: async (rollNo, phone, email, password, name) => {
+        try {
+            const { data } = await API.post('/auth/register', { rollNo, phone, email, password, name });
+            return { success: true, user: normalize(data) };
+        } catch (error) {
+            return { success: false, error: error.response?.data?.message || 'Registration failed' };
+        }
+    },
+
+    // --- Guide Requests ---
+    sendGuideRequest: async (staffId) => {
+        try { const { data } = await API.post('/guide-requests', { staffId }); return { success: true, data: normalize(data) }; }
+        catch (error) { return { success: false, error: error.response?.data?.message || 'Failed to send request' }; }
+    },
+    getMyGuideRequest: async () => {
+        try { const { data } = await API.get('/guide-requests/mine'); return { success: true, data: normalize(data) }; }
+        catch (error) { return { success: false, error: error.response?.data?.message || 'Failed to fetch request' }; }
+    },
+    getIncomingRequests: async () => {
+        try { const { data } = await API.get('/guide-requests/incoming'); return { success: true, data: normalize(data) }; }
+        catch (error) { return { success: false, error: error.response?.data?.message || 'Failed to fetch incoming requests' }; }
+    },
+    acceptGuideRequest: async (requestId) => {
+        try { const { data } = await API.put(`/guide-requests/${requestId}/accept`); return { success: true, data: normalize(data) }; }
+        catch (error) { return { success: false, error: error.response?.data?.message || 'Failed to accept request' }; }
+    },
+    rejectGuideRequest: async (requestId, reason) => {
+        try { const { data } = await API.put(`/guide-requests/${requestId}/reject`, { reason }); return { success: true, data: normalize(data) }; }
+        catch (error) { return { success: false, error: error.response?.data?.message || 'Failed to reject request' }; }
+    },
+    setStaffCapacity: async (staffId, maxStudents) => {
+        try { const { data } = await API.put(`/users/${staffId}/capacity`, { maxStudents }); return { success: true, data: normalize(data) }; }
+        catch (error) { return { success: false, error: error.response?.data?.message || 'Failed to update capacity' }; }
+    },
+
     deleteUser: async (userId) => {
         try { await API.delete(`/users/${userId}`); return { success: true }; }
         catch (error) { return { success: false, error: error.response?.data?.message || 'Delete failed' }; }
@@ -46,9 +92,18 @@ export const ProjectService = {
         } catch (error) { return []; }
     },
 
-    submitProposal: async (studentId, studentName, proposalData) => {
+    submitProposal: async (studentId, studentName, proposalData, abstractFile) => {
         try {
-            const { data } = await API.post('/projects', { ...proposalData, studentId, studentName });
+            const formData = new FormData();
+            formData.append('studentId', studentId);
+            formData.append('studentName', studentName);
+            for (const key in proposalData) {
+                if (proposalData[key]) formData.append(key, proposalData[key]);
+            }
+            if (abstractFile) {
+                formData.append('abstractFile', abstractFile);
+            }
+            const { data } = await API.post('/projects', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
             return { success: true, data: normalize(data) };
         } catch (error) {
             return { success: false, error: error.response?.data?.message || 'Submission failed' };
@@ -96,6 +151,16 @@ export const ProjectService = {
             return { success: true, data: normalize(data) };
         } catch (error) {
             return { success: false, error: error.response?.data?.message || 'Second review submission failed' };
+        }
+    },
+
+    // Viva Score marks (Guide)
+    submitVivaScore: async (projectId, marks, actorName, actorId) => {
+        try {
+            const { data } = await API.put(`/projects/${projectId}/viva-score`, { marks, actorName, actorId });
+            return { success: true, data: normalize(data) };
+        } catch (error) {
+            return { success: false, error: error.response?.data?.message || 'Viva score submission failed' };
         }
     },
 

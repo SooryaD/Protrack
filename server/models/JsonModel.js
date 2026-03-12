@@ -19,7 +19,7 @@ class JsonModel {
             const data = await fs.readFile(DB_PATH, 'utf-8');
             return JSON.parse(data);
         } catch (error) {
-            return { users: [], projects: [] };
+            return { users: [], projects: [], studentRegistry: [], guideRequests: [] };
         }
     }
 

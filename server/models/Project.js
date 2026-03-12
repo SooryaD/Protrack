@@ -13,6 +13,7 @@ class Project extends JsonModel {
         if (this.cscStatus === undefined) this.cscStatus = null;
         if (this.cscComment === undefined) this.cscComment = '';
         if (this.cscReviewedAt === undefined) this.cscReviewedAt = null;
+        if (this.vivaScore === undefined) this.vivaScore = null;
     }
 }
 

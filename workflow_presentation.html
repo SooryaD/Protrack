@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protrack in-Depth Technical Workflow</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0F172A;
+            overflow: hidden;
+            color: #F8FAFC;
+        }
+
+        .slide-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .slide {
+            min-width: 100vw;
+            height: 100vh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Master Slide Theme */
+        .slide-header {
+            background: #1E293B;
+            height: 60px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 40px;
+        }
+
+        .slide-title-txt {
+            font-size: 20px;
+            font-weight: bold;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .slide-subtitle-txt {
+            font-size: 14px;
+            color: #94A3B8;
+        }
+
+        .slide-content {
+            flex: 1;
+            padding: 40px 80px;
+            position: relative;
+            background: #F8FAFC;
+            color: #0F172A;
+            overflow-y: auto;
+        }
+
+        .slide-footer {
+            background: #E2E8F0;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            padding: 0 40px;
+            font-size: 12px;
+            color: #64748B;
+            justify-content: space-between;
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 64px;
+            margin: 0;
+            padding: 0;
+            color: #38BDF8;
+            letter-spacing: -1px;
+        }
+
+        h2 {
+            font-size: 36px;
+            margin: 0 0 20px 0;
+            color: #0F172A;
+            font-weight: 800;
+            border-bottom: 2px solid #E2E8F0;
+            padding-bottom: 10px;
+        }
+
+        h3 {
+            font-size: 24px;
+            color: #1D4ED8;
+            margin: 0 0 10px 0;
+        }
+
+        p {
+            font-size: 18px;
+            line-height: 1.6;
+            color: #475569;
+            margin-bottom: 20px;
+        }
+
+        ul {
+            font-size: 18px;
+            color: #475569;
+            line-height: 1.6;
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 15px;
+        }
+
+        strong {
+            color: #0F172A;
+        }
+
+        /* Grids & Cards */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-top: 20px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            border: 1px solid #E2E8F0;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            background: #E2E8F0;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+
+        .badge-blue {
+            background: #DBEAFE;
+            color: #1D4ED8;
+        }
+
+        .badge-red {
+            background: #FEE2E2;
+            color: #DC2626;
+        }
+
+        .badge-green {
+            background: #DCFCE7;
+            color: #16A34A;
+        }
+
+        .badge-purple {
+            background: #F3E8FF;
+            color: #7E22CE;
+        }
+
+        .badge-yellow {
+            background: #FEF9C3;
+            color: #CA8A04;
+        }
+
+        /* Welcome Slide Override */
+        .welcome-slide {
+            background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .welcome-slide h1 {
+            font-size: 80px;
+            margin-bottom: 20px;
+            text-shadow: 0 4px 20px rgba(56, 189, 248, 0.2);
+        }
+
+        .welcome-slide h2 {
+            color: #F8FAFC;
+            border: none;
+            font-weight: 400;
+            margin-bottom: 10px;
+        }
+
+        .welcome-slide p {
+            color: #94A3B8;
+            font-size: 22px;
+        }
+
+        /* Navigation Controls */
+        .controls {
+            position: fixed;
+            bottom: 45px;
+            right: 40px;
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+            align-items: center;
+        }
+
+        .slide-counter {
+            font-size: 16px;
+            color: #FFFFFF;
+            font-weight: bold;
+            margin-right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+
+        button {
+            background: #38BDF8;
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        button:hover {
+            background: #0284C7;
+            transform: scale(1.1);
+        }
+
+        button:disabled {
+            background: #475569;
+            cursor: not-allowed;
+            transform: scale(1);
+            opacity: 0.5;
+            box-shadow: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="slide-container" id="slider">
+
+        <!-- Slide 1: Welcome -->
+        <div class="slide welcome-slide">
+            <h1>PROTRACK</h1>
+            <h2>In-Depth Technical Pipeline & Architecture</h2>
+            <p>Anna University CDE Student Project Management System</p>
+            <div
+                style="background: rgba(255,255,255,0.1); padding: 15px 30px; border-radius: 8px; margin-top: 40px; border: 1px solid rgba(255,255,255,0.2);">
+                <p style="margin:0; font-size: 16px; color: #E2E8F0;">Use the <b style="color:white;">Left/Right
+                        arrows</b> ← → on your keyboard to navigate.</p>
+            </div>
+        </div>
+
+        <!-- Slide 2: Core Philosophy -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-title-txt">Protrack Architecture</div>
+                <div class="slide-subtitle-txt">Overview</div>
+            </div>
+            <div class="slide-content">
+                <h2>System Overview & Security Architecture</h2>
+                <div class="grid-2">
+                    <div>
+                        <p>Protrack is a comprehensive, asynchronous state-machine designed to handle the intricate
+                            workflow of University-level project evaluations. It abandons paper trails in favor of a
+                            strictly structured role-based access pipeline.</p>
+                        <h3>Technical Stack</h3>
+                        <ul>
+                            <li><strong>Frontend:</strong> React.js, Vite, Context API for persistent session
+                                management.</li>
+                            <li><strong>Backend:</strong> Node.js, Express.js REST API layer.</li>
+                            <li><strong>Authentication:</strong> JSON Web Tokens (JWT) & bcrypt securely hashing
+                                passwords.</li>
+                            <li><strong>State Transitions:</strong> Enforced backend middleware verifies roles before
+                                allowing a project to jump to the next grading stage.</li>
+                        </ul>
+                    </div>
+                    <div class="card" style="background:#F1F5F9;">
+                        <h3>Guiding Principles</h3>
+                        <ul>
+                            <li><strong>Zero Data Loss:</strong> Missing fields automatically fallback or prevent DB
+                                commits.</li>
+                            <li><strong>Capacity Constraints:</strong> The system actively prevents guides from
+                                accepting more students than their allowed quota (default 2/guide).</li>
+                            <li><strong>Strict Sequence:</strong> A student cannot skip to Milestone 2 without passing
+                                Milestone 1. Admins cannot review before a Guide approves.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-footer"><span>Anna University CDE</span></div>
+        </div>
+
+        <!-- Slide 3: Roles -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-title-txt">Protrack Architecture</div>
+                <div class="slide-subtitle-txt">Actors</div>
+            </div>
+            <div class="slide-content">
+                <h2>The 3 Core Actors (Role-Based Access)</h2>
+                <div class="grid-3">
+                    <div class="card" style="border-top: 5px solid #1D4ED8;">
+                        <h3>1. The Student</h3>
+                        <p>The instigator of the pipeline. Their UI is strictly limited to their own project ticket.</p>
+                        <ul>
+                            <li>Self-registers and verifies pre-authorized Roll Numbers.</li>
+                            <li>Initiates Guide Requests.</li>
+                            <li>Submits Project Abstracts, domains, and technologies.</li>
+                            <li>Uploads Final Completed Reports.</li>
+                        </ul>
+                    </div>
+                    <div class="card" style="border-top: 5px solid #DC2626;">
+                        <h3>2. The Staff Guide</h3>
+                        <p>The academic mentor. They are governed by an active "Student Capacity Limit".</p>
+                        <ul>
+                            <li>Approves/Rejects incoming mentorship requests dynamically.</li>
+                            <li>Filters and approves the initial project title and abstract.</li>
+                            <li>Acts as the primary grader for the Midterm (R1) and Final (R2) milestone reviews.</li>
+                            <li>Authorizes the final project completion for Viva-Voce.</li>
+                        </ul>
+                    </div>
+                    <div class="card" style="border-top: 5px solid #16A34A;">
+                        <h3>3. System Admin & CSC</h3>
+                        <p>The overarching university authority and Central Steering Committee.</p>
+                        <ul>
+                            <li>Maintains massive overhead visibility of all project statuses.</li>
+                            <li>Manages the raw Capacity quotas for individual staff guides.</li>
+                            <li>Performs the crucial <strong>CSC Audit</strong>: Determining if the project scope is
+                                adequate for a master's degree before development begins.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-footer"><span>Anna University CDE</span></div>
+        </div>
+
+        <!-- Slide 4: Phase 1 & 2 -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-title-txt">Protrack Architecture</div>
+                <div class="slide-subtitle-txt">Phase 1 & 2: Initiation</div>
+            </div>
+            <div class="slide-content">
+                <h2>Phase 1 & 2: Guide Matchmaking & The Proposal</h2>
+                <div class="grid-2">
+                    <div>
+                        <h3 style="color:#0F172A;">Phase 1: Guide Matchmaking</h3>
+                        <p>Before any project work begins, the student must secure a guide. This prevents "orphan"
+                            projects from entering the database.</p>
+                        <ul>
+                            <li>The student views a real-time list of all Guides and their current free slots (e.g.,
+                                <strong>Capacity 1/2</strong>).</li>
+                            <li>The student submits a <span class="badge badge-blue">REQUEST PENDING</span> ticket.</li>
+                            <li>The Guide reads the request. If they decline, the student is notified to try another
+                                Guide. If they accept, the system instantly sets the student's
+                                <strong>assignedGuideId</strong>, binding them permanently.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 style="color:#0F172A;">Phase 2: Project Proposal formulation</h3>
+                        <p>The student drafts their application. The system generates a unique tracking ID (e.g.,
+                            <strong>EDU-PRJ-2026-004</strong>) ensuring tracking continuity.</p>
+                        <ul>
+                            <li><strong>Title & Abstract:</strong> The core of the idea.</li>
+                            <li><strong>Tech Stack & Domain:</strong> E.g., 'React, Node, Python' in 'Cloud Computing'.
+                            </li>
+                            <li>Status becomes <span class="badge badge-yellow">TITLE_PENDING</span>. Only the assigned
+                                Guide can view and approve this. Once Guide approves, it transitions to <span
+                                    class="badge badge-purple">TITLE_APPROVED</span>.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-footer"><span>Anna University CDE</span></div>
+        </div>
+
+        <!-- Slide 5: Phase 3 (CSC) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-title-txt">Protrack Architecture</div>
+                <div class="slide-subtitle-txt">Phase 3: Administrative Audit</div>
+            </div>
+            <div class="slide-content">
+                <h2>Phase 3: The Central Steering Committee (CSC) Audit</h2>
+                <div class="card" style="margin-bottom: 20px;">
+                    <p style="margin: 0;">Once a Guide approves the initial proposal, development
+                        <strong>cannot</strong> legally start. It enters a holding pattern awaiting University-level
+                        clearance by the Admin (CSC pane).</p>
+                </div>
+
+                <h3>CSC Decision Matrix</h3>
+                <div class="grid-3">
+                    <div class="card" style="background:#F0FDF4; border:1px solid #BBF7D0;">
+                        <h4 style="margin-top:0; color:#16A34A; display:flex; align-items:center; gap:8px;">✅ Approved
+                        </h4>
+                        <p style="font-size: 15px; margin:0;">The scope is deemed sufficient for a university degree.
+                            The project status shifts to <span class="badge badge-green">CSC_APPROVED</span>.</p>
+                        <p style="font-size: 15px; margin-top: 10px;"><strong>Action:</strong> The student is permitted
+                            to begin development and system design.</p>
+                    </div>
+                    <div class="card" style="background:#FEF9C3; border:1px solid #FEF08A;">
+                        <h4 style="margin-top:0; color:#CA8A04; display:flex; align-items:center; gap:8px;">↩ Scope
+                            Modification</h4>
+                        <p style="font-size: 15px; margin:0;">The idea is good, but too simple or overly complex. Admin
+                            must provide a strict written reason.</p>
+                        <p style="font-size: 15px; margin-top: 10px;"><strong>Action:</strong> Ticket bounces back to
+                            Student. They must edit the abstract and resubmit.</p>
+                    </div>
+                    <div class="card" style="background:#FEF2F2; border:1px solid #FECACA;">
+                        <h4 style="margin-top:0; color:#DC2626; display:flex; align-items:center; gap:8px;">❌ Not
+                            Approved</h4>
+                        <p style="font-size: 15px; margin:0;">The submitted project has failed the audit entirely (e.g.,
+                            plagiarism, inappropriate domain).</p>
+                        <p style="font-size: 15px; margin-top: 10px;"><strong>Action:</strong> The concept is killed.
+                            The student must start over with a fresh proposal.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-footer"><span>Anna University CDE</span></div>
+        </div>
+
+        <!-- Slide 6: Phase 4 & 5 (Grading) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-title-txt">Protrack Architecture</div>
+                <div class="slide-subtitle-txt">Phase 4 & 5: Grading & Completion</div>
+            </div>
+            <div class="slide-content">
+                <h2>Phase 4 & 5: Milestone Reviews and Finalization</h2>
+                <p>Once CSC Approved, the student builds the software. The Staff Guide conducts two highly structured,
+                    math-based grading reviews.</p>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <h3>Review 1 (First Review) <span class="badge badge-blue">R1</span></h3>
+                        <p style="font-size: 15px;">Evaluates initial problem-solving.</p>
+                        <ul style="font-size: 15px;">
+                            <li>Problem Definition & Scope (20)</li>
+                            <li>Literature Review / Feasibility (20)</li>
+                            <li>Novelty / Creativity (10)</li>
+                            <li>Detailed Design / Constraints (20)</li>
+                            <li>Methodology (30)</li>
+                        </ul>
+                        <p style="font-size: 14px; color:#1D4ED8; font-weight:bold; margin:0;">System mathematically
+                            sums out of 100, then normalizes to a 20-point scale for the university ledger.</p>
+                    </div>
+
+                    <div class="card">
+                        <h3>Review 2 (Second Review) <span class="badge badge-purple">R2</span></h3>
+                        <p style="font-size: 15px;">Evaluates execution and outcomes.</p>
+                        <ul style="font-size: 15px;">
+                            <li>System Design / Work Flow (20)</li>
+                            <li>Modules Implementation (50)</li>
+                            <li>Data Set / Outputs (20)</li>
+                            <li>Contribution (10)</li>
+                        </ul>
+                        <p style="font-size: 14px; color:#7E22CE; font-weight:bold; margin:0;">System mathematically
+                            normalizes to a 20-point scale. Status becomes <span
+                                class="badge badge-purple">SECOND_REVIEW_DONE</span>.</p>
+                    </div>
+                </div>
+
+                <div class="card"
+                    style="margin-top:20px; border-left: 6px solid #16A34A; display:flex; align-items:center; gap: 20px;">
+                    <div>
+                        <h3 style="margin:0;">Phase 5: The Final Project State</h3>
+                        <p style="font-size: 15px; margin: 10px 0 0 0;">The student clicks "Submit Final Report". The
+                            guide reviews the physical/digital documents, checks the code for plagiarism, and triggers
+                            the final system state: <span class="badge badge-green">PROJECT_COMPLETED</span>. The
+                            student is now cleared to graduate and attend Viva-Voce.</p>
+                    </div>
+                </div>
+
+            </div>
+            <div class="slide-footer"><span>Anna University CDE</span></div>
+        </div>
+
+    </div>
+
+    <!-- Navigation -->
+    <div class="controls">
+        <div class="slide-counter"><span id="currSlide">1</span> / 6</div>
+        <button id="prevBtn" onclick="moveSlide(-1)" disabled>❮</button>
+        <button id="nextBtn" onclick="moveSlide(1)">❯</button>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const totalSlides = 6;
+        const slider = document.getElementById('slider');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const currSlideLabel = document.getElementById('currSlide');
+
+        function moveSlide(dir) {
+            currentSlide += dir;
+            if (currentSlide < 0) currentSlide = 0;
+            if (currentSlide >= totalSlides) currentSlide = totalSlides - 1;
+
+            slider.style.transform = `translateX(-${currentSlide * 100}vw)`;
+            currSlideLabel.innerText = currentSlide + 1;
+
+            prevBtn.disabled = currentSlide === 0;
+            nextBtn.disabled = currentSlide === totalSlides - 1;
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') moveSlide(1);
+            if (e.key === 'ArrowLeft') moveSlide(-1);
+        });
+    </script>
+</body>
+
+</html>

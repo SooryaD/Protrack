@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ProjectService } from '../services/storage';
 import { useAuth } from '../context/AuthContext';
-import { Check, X, Clock, FileText, Star, Award, ChevronDown, ChevronUp, LayoutDashboard } from 'lucide-react';
+import { Check, X, Clock, FileText, Star, Award, LayoutDashboard, Users } from 'lucide-react';
 
 // ─── First Review criteria (max 100 → normalized to 20) ─────────
 const FIRST_REVIEW_CRITERIA = [
@@ -35,8 +35,46 @@ const STATUS_META = {
     'FIRST_REVIEW_DONE': { label: '1st Done', color: '#22C55E' },
     'SECOND_REVIEW_DONE': { label: '2nd Done', color: '#22C55E' },
     'PROJECT_SUBMITTED': { label: 'Report Submitted', color: '#3B82F6' },
+    'REPORT_CHANGES_REQUESTED': { label: 'Report Revision', color: '#EF4444' },
     'DOCUMENTS_VERIFIED': { label: 'Docs Verified', color: '#22C55E' },
+    'PENDING_ADMIN_APPROVAL': { label: 'Admin Pending', color: '#8B5CF6' },
     'PROJECT_COMPLETED': { label: 'Completed', color: '#16A34A' },
+};
+
+const ReviewMarksForm = ({ projectId, criteria, marks, setMarks, onSubmit, title, onCancel }) => {
+    const vals = marks[projectId] || initMarks(criteria);
+    const total = criteria.reduce((s, c) => s + (parseInt(vals[c.key]) || 0), 0);
+    const normalized = Math.round((total / 100) * 20 * 10) / 10;
+    return (
+        <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem', marginTop: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Star size={15} color="#F59E0B" fill="#F59E0B" /> {title}
+                </h4>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)' }}>Score: {normalized}/20</div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                {criteria.map(c => (
+                    <div key={c.key}>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>
+                            {c.label} <span style={{ color: 'var(--primary)' }}>(max {c.max})</span>
+                        </label>
+                        <input
+                            type="number" min={0} max={c.max}
+                            value={vals[c.key]}
+                            onChange={e => setMarks(prev => ({ ...prev, [projectId]: { ...vals, [c.key]: e.target.value } }))}
+                            className="saas-input"
+                            style={{ padding: '0.35rem 0.6rem', fontSize: '0.9rem' }}
+                        />
+                    </div>
+                ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                <button onClick={onCancel} style={{ padding: '0.4rem 0.75rem', background: 'white', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}>Cancel</button>
+                <button onClick={onSubmit} className="btn-primary" style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Submit Marks</button>
+            </div>
+        </div>
+    );
 };
 
 const StaffDashboard = () => {
@@ -46,23 +84,53 @@ const StaffDashboard = () => {
     const [expanded, setExpanded] = useState({});
     const [firstMarks, setFirstMarks] = useState({});
     const [secondMarks, setSecondMarks] = useState({});
+    const [vivaMarks, setVivaMarks] = useState({});
     const [activeReviewForm, setActiveReviewForm] = useState({});
+    const [view, setView] = useState('projects');
+    const [incomingRequests, setIncomingRequests] = useState([]);
+    const [rejectionReasons, setRejectionReasons] = useState({});
 
     useEffect(() => {
         if (user) {
             loadProposals();
-            const interval = setInterval(loadProposals, 5000);
+            loadIncomingRequests();
+            const interval = setInterval(() => { loadProposals(); loadIncomingRequests(); }, 5000);
             return () => clearInterval(interval);
         }
     }, [user]);
+
+    const loadIncomingRequests = async () => {
+        const reqs = await ProjectService.getIncomingRequests();
+        if (reqs.success) setIncomingRequests(reqs.data);
+    };
 
     const loadProposals = async () => {
         const all = await ProjectService.getAllProposals();
         setProposals(all.filter(p => p.guideId === user.id));
     };
 
+    const handleAcceptRequest = async (id) => {
+        const res = await ProjectService.acceptGuideRequest(id);
+        if (res.success) {
+            loadIncomingRequests();
+        } else {
+            alert('Accept failed: ' + res.error);
+        }
+    };
+
+    const handleRejectRequest = async (id) => {
+        if (!rejectionReasons[id]) return alert('Please provide a reason for rejection.');
+        const res = await ProjectService.rejectGuideRequest(id, rejectionReasons[id]);
+        if (res.success) {
+            setRejectionReasons(prev => ({ ...prev, [id]: '' }));
+            loadIncomingRequests();
+        } else {
+            alert('Reject failed: ' + res.error);
+        }
+    };
+
     const handleAction = async (id, status) => {
-        if (['CHANGES_REQUESTED', 'TITLE_REJECTED'].includes(status) && !comment[id]) {
+        if (['CHANGES_REQUESTED', 'TITLE_REJECTED', 'REPORT_CHANGES_REQUESTED'].includes(status) && !comment[id]) {
             alert('Please provide a reason when requesting changes or rejecting.'); return;
         }
         const res = await ProjectService.updateStatus(id, status, comment[id], user.name, user.role, user.id);
@@ -94,48 +162,20 @@ const StaffDashboard = () => {
         else alert('Failed: ' + res.error);
     };
 
-    const ReviewMarksForm = ({ projectId, criteria, marks, setMarks, onSubmit, title }) => {
-        const vals = marks[projectId] || initMarks(criteria);
-        const total = criteria.reduce((s, c) => s + (parseInt(vals[c.key]) || 0), 0);
-        const normalized = Math.round((total / 100) * 20 * 10) / 10;
-        return (
-            <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem', marginTop: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <h4 style={{ fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Star size={15} color="#F59E0B" fill="#F59E0B" /> {title}
-                    </h4>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)' }}>Score: {normalized}/20</div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
-                    {criteria.map(c => (
-                        <div key={c.key}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>
-                                {c.label} <span style={{ color: 'var(--primary)' }}>(max {c.max})</span>
-                            </label>
-                            <input
-                                type="number" min={0} max={c.max}
-                                value={vals[c.key]}
-                                onChange={e => setMarks(prev => ({ ...prev, [projectId]: { ...vals, [c.key]: e.target.value } }))}
-                                className="saas-input"
-                                style={{ padding: '0.35rem 0.6rem', fontSize: '0.9rem' }}
-                            />
-                        </div>
-                    ))}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-                    <button onClick={() => setActiveReviewForm(p => ({ ...p, [projectId]: null }))} style={{ padding: '0.4rem 0.75rem', background: 'white', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}>Cancel</button>
-                    <button onClick={onSubmit} className="btn-primary" style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Submit Marks</button>
-                </div>
-            </div>
-        );
+    const handleVivaScore = async (projectId) => {
+        const score = parseInt(vivaMarks[projectId]);
+        if (isNaN(score) || score < 0 || score > 20) { alert('Viva score must be between 0 and 20.'); return; }
+        const res = await ProjectService.submitVivaScore(projectId, score, user.name, user.id);
+        if (res.success) { setActiveReviewForm(p => ({ ...p, [projectId]: null })); loadProposals(); }
+        else alert('Failed: ' + res.error);
     };
 
     const columns = [
         { id: 'review', title: 'TITLE REVIEW', color: '#F59E0B', filter: p => ['TITLE_PENDING', 'RESUBMITTED'].includes(p.status) },
         { id: 'approved', title: 'APPROVED', color: '#22C55E', filter: p => p.status === 'TITLE_APPROVED' },
         { id: 'reviewing', title: 'REVIEWS', color: '#8B5CF6', filter: p => ['FIRST_REVIEW_PENDING', 'FIRST_REVIEW_DONE', 'SECOND_REVIEW_DONE'].includes(p.status) },
-        { id: 'final', title: 'FINAL REVIEW', color: '#3B82F6', filter: p => ['PROJECT_SUBMITTED', 'DOCUMENTS_VERIFIED'].includes(p.status) },
-        { id: 'done', title: 'DONE', color: '#22C55E', filter: p => ['PROJECT_COMPLETED', 'TITLE_REJECTED', 'CSC_NOT_APPROVED'].includes(p.status) },
+        { id: 'final', title: 'FINAL REVIEW', color: '#3B82F6', filter: p => ['PROJECT_SUBMITTED', 'DOCUMENTS_VERIFIED', 'REPORT_CHANGES_REQUESTED'].includes(p.status) },
+        { id: 'done', title: 'DONE', color: '#22C55E', filter: p => ['PROJECT_COMPLETED', 'TITLE_REJECTED', 'CSC_NOT_APPROVED', 'PENDING_ADMIN_APPROVAL'].includes(p.status) },
     ];
 
     return (
@@ -146,137 +186,232 @@ const StaffDashboard = () => {
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.4rem' }}>Review proposals, submit review marks, and manage student projects.</p>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem' }}>
-                    <span style={{ background: '#F3E8FF', color: '#8B5CF6', padding: '0.35rem 0.75rem', borderRadius: 'var(--radius-sm)', fontWeight: 600 }}>{proposals.filter(p => ['FIRST_REVIEW_PENDING', 'FIRST_REVIEW_DONE', 'SECOND_REVIEW_DONE'].includes(p.status)).length} In Review</span>
-                    <span style={{ background: '#DCFCE7', color: '#16A34A', padding: '0.35rem 0.75rem', borderRadius: 'var(--radius-sm)', fontWeight: 600 }}>{proposals.filter(p => p.status === 'PROJECT_COMPLETED').length} Completed</span>
+                    <div style={{ display: 'flex', background: '#F1F5F9', borderRadius: 'var(--radius-md)', padding: '0.35rem', border: '1px solid var(--border-color)' }}>
+                        <button onClick={() => setView('projects')} style={{ padding: '0.5rem 1rem', borderRadius: 'var(--radius-sm)', background: view === 'projects' ? 'white' : 'transparent', color: view === 'projects' ? 'var(--primary)' : 'var(--text-muted)', fontWeight: view === 'projects' ? 600 : 500, border: 'none', boxShadow: view === 'projects' ? 'var(--shadow-sm)' : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <LayoutDashboard size={16} /> Projects
+                        </button>
+                        <button onClick={() => setView('requests')} style={{ padding: '0.5rem 1rem', borderRadius: 'var(--radius-sm)', background: view === 'requests' ? 'white' : 'transparent', color: view === 'requests' ? 'var(--primary)' : 'var(--text-muted)', fontWeight: view === 'requests' ? 600 : 500, border: 'none', boxShadow: view === 'requests' ? 'var(--shadow-sm)' : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <Users size={16} /> Guide Requests
+                            {incomingRequests.filter(r => r.status === 'pending').length > 0 && (
+                                <span style={{ background: '#EF4444', color: 'white', fontSize: '0.65rem', padding: '1px 5px', borderRadius: '10px' }}>{incomingRequests.filter(r => r.status === 'pending').length}</span>
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '1.25rem', flex: 1, overflowX: 'auto', paddingBottom: '1rem' }}>
-                {columns.map(col => {
-                    const colProposals = proposals.filter(col.filter);
-                    return (
-                        <div key={col.id} style={{ flex: '1', minWidth: '300px', background: '#F8FAFC', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                            <div style={{ padding: '1rem 1.25rem', borderBottom: `3px solid ${col.color}`, background: 'white' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <h3 style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{col.title}</h3>
-                                    <div style={{ background: `${col.color}20`, color: col.color, fontWeight: 700, fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px' }}>{colProposals.length}</div>
+            {view === 'requests' && (
+                <div className="animate-fade-in saas-card" style={{ padding: '1.5rem', flex: 1, overflowY: 'auto' }}>
+                    <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Student Guide Requests</h2>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {incomingRequests.filter(r => r.status === 'pending').map(r => (
+                            <div key={r.id || r._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem', background: '#F8FAFC', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                                <div>
+                                    <h3 style={{ fontSize: '1.05rem', margin: '0 0 0.25rem 0' }}>{r.studentName}</h3>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Roll No: {r.rollNo}</div>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '300px' }}>
+                                    <textarea
+                                        placeholder="Reason (if rejecting)..."
+                                        value={rejectionReasons[r.id || r._id] || ''}
+                                        onChange={(e) => setRejectionReasons(prev => ({ ...prev, [r.id || r._id]: e.target.value }))}
+                                        style={{ width: '100%', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.5rem', fontSize: '0.8rem', resize: 'none' }}
+                                        rows={1}
+                                    />
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <button onClick={() => handleAcceptRequest(r.id || r._id)} style={{ flex: 1, padding: '0.5rem', background: '#DCFCE7', color: '#15803D', border: '1px solid #BBF7D0', borderRadius: 'var(--radius-sm)', fontWeight: 600, cursor: 'pointer' }}>✓ Accept</button>
+                                        <button onClick={() => handleRejectRequest(r.id || r._id)} style={{ flex: 1, padding: '0.5rem', background: '#FEE2E2', color: '#DC2626', border: '1px solid #FECACA', borderRadius: 'var(--radius-sm)', fontWeight: 600, cursor: 'pointer' }}>✗ Reject</button>
+                                    </div>
                                 </div>
                             </div>
+                        ))}
+                        {incomingRequests.filter(r => r.status === 'pending').length === 0 && (
+                            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                                No pending requests.
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
-                            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.875rem', padding: '0.875rem' }}>
-                                {colProposals.map(p => {
-                                    const isExpanded = expanded[p.id];
-                                    const showReviewForm = activeReviewForm[p.id];
-                                    return (
-                                        <div key={p.id} className="saas-card animate-fade-in" style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', background: '#F1F5F9', padding: '2px 6px', borderRadius: '4px' }}>{p.ticketId}</span>
-                                                <span style={{ fontSize: '0.68rem', fontWeight: 600, color: STATUS_META[p.status]?.color || 'gray' }}>{STATUS_META[p.status]?.label || p.status}</span>
-                                            </div>
+            {view === 'projects' && (
+                <div style={{ display: 'flex', gap: '1.25rem', flex: 1, overflowX: 'auto', paddingBottom: '1rem' }}>
+                    {columns.map(col => {
+                        const colProposals = proposals.filter(col.filter);
+                        return (
+                            <div key={col.id} style={{ flex: '1', minWidth: '300px', background: '#F8FAFC', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                <div style={{ padding: '1rem 1.25rem', borderBottom: `3px solid ${col.color}`, background: 'white' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <h3 style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{col.title}</h3>
+                                        <div style={{ background: `${col.color}20`, color: col.color, fontWeight: 700, fontSize: '0.75rem', padding: '2px 8px', borderRadius: '12px' }}>{colProposals.length}</div>
+                                    </div>
+                                </div>
 
-                                            <div style={{ fontWeight: 600, fontSize: '0.9rem', lineHeight: 1.4 }}>{p.title}</div>
-
-                                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 600 }}>{p.studentName?.charAt(0)}</div>
-                                                {p.studentName} · {p.domain}
-                                            </div>
-
-                                            {/* Existing review scores */}
-                                            {(p.firstReview || p.secondReview) && (
-                                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                                    {p.firstReview && <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: '#F3E8FF', color: '#8B5CF6', borderRadius: '4px', fontWeight: 600 }}>R1: {p.firstReview.normalizedOutOf20}/20</span>}
-                                                    {p.secondReview && <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: '#DCFCE7', color: '#16A34A', borderRadius: '4px', fontWeight: 600 }}>R2: {p.secondReview.normalizedOutOf20}/20</span>}
+                                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.875rem', padding: '0.875rem' }}>
+                                    {colProposals.map(p => {
+                                        const isExpanded = expanded[p.id];
+                                        const showReviewForm = activeReviewForm[p.id];
+                                        return (
+                                            <div key={p.id} className="saas-card animate-fade-in" style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', background: '#F1F5F9', padding: '2px 6px', borderRadius: '4px' }}>{p.ticketId}</span>
+                                                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: STATUS_META[p.status]?.color || 'gray' }}>{STATUS_META[p.status]?.label || p.status}</span>
                                                 </div>
-                                            )}
 
-                                            {/* File links for review */}
-                                            {['PROJECT_SUBMITTED', 'DOCUMENTS_VERIFIED', 'PROJECT_COMPLETED'].includes(p.status) && p.repository && (
-                                                <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.78rem' }}>
-                                                    {p.repository.code && <a href={`http://localhost:5000/${p.repository.code}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#EFF6FF', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> Code</a>}
-                                                    {p.repository.report && <a href={`http://localhost:5000/${p.repository.report}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#EFF6FF', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> Report</a>}
+                                                <div style={{ fontWeight: 600, fontSize: '0.9rem', lineHeight: 1.4 }}>{p.title}</div>
+
+                                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 600 }}>{p.studentName?.charAt(0)}</div>
+                                                    {p.studentName} · {p.domain}
                                                 </div>
-                                            )}
 
-                                            {/* ACTIONS */}
-                                            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                                                {/* Existing review scores */}
+                                                {(p.firstReview || p.secondReview || p.vivaScore) && (
+                                                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                        {p.firstReview && <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: '#F3E8FF', color: '#8B5CF6', borderRadius: '4px', fontWeight: 600 }}>R1: {p.firstReview.normalizedOutOf20}/20</span>}
+                                                        {p.secondReview && <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: '#DCFCE7', color: '#16A34A', borderRadius: '4px', fontWeight: 600 }}>R2: {p.secondReview.normalizedOutOf20}/20</span>}
+                                                        {p.vivaScore && <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: '#DBEAFE', color: '#2563EB', borderRadius: '4px', fontWeight: 600 }}>Viva: {p.vivaScore.marks}/20</span>}
+                                                    </div>
+                                                )}
 
-                                                {/* Title review actions */}
-                                                {['TITLE_PENDING', 'RESUBMITTED'].includes(p.status) && (
-                                                    <>
-                                                        <textarea
-                                                            placeholder="Comment / reason (required for Reject or Changes)…"
-                                                            value={comment[p.id] || ''}
-                                                            onChange={e => setComment({ ...comment, [p.id]: e.target.value })}
-                                                            style={{ width: '100%', background: 'white', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '0.78rem', padding: '0.5rem', borderRadius: 'var(--radius-sm)', resize: 'none', outline: 'none' }}
-                                                            rows={2}
-                                                        />
+                                                {/* File links for review */}
+                                                {p.repository && (
+                                                    <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.78rem', flexWrap: 'wrap' }}>
+                                                        {p.repository.abstract && <a href={`http://localhost:5000/${p.repository.abstract}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#EFF6FF', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> Abstract</a>}
+                                                        {p.repository.firstReview && <a href={`http://localhost:5000/${p.repository.firstReview}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#EFF6FF', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> R1 Doc</a>}
+                                                        {p.repository.secondReview && <a href={`http://localhost:5000/${p.repository.secondReview}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#EFF6FF', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> R2 Doc</a>}
+                                                        {p.repository.code && <a href={`http://localhost:5000/${p.repository.code}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#EFF6FF', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> Code</a>}
+                                                        {p.repository.report && <a href={`http://localhost:5000/${p.repository.report}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--danger)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#FEE2E2', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> Report</a>}
+                                                    </div>
+                                                )}
+
+                                                {/* ACTIONS */}
+                                                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+
+                                                    {/* Title review OR Final submission actions (since both can be rejected) */}
+                                                    {['TITLE_PENDING', 'RESUBMITTED', 'PROJECT_SUBMITTED', 'REPORT_CHANGES_REQUESTED'].includes(p.status) && (
+                                                        <>
+                                                            <textarea
+                                                                placeholder="Comment / reason (required for Reject or Changes)…"
+                                                                value={comment[p.id] || ''}
+                                                                onChange={e => setComment({ ...comment, [p.id]: e.target.value })}
+                                                                style={{ width: '100%', background: 'white', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '0.78rem', padding: '0.5rem', borderRadius: 'var(--radius-sm)', resize: 'none', outline: 'none' }}
+                                                                rows={2}
+                                                            />
+                                                        </>
+                                                    )}
+
+                                                    {['TITLE_PENDING', 'RESUBMITTED'].includes(p.status) && (
                                                         <div style={{ display: 'flex', gap: '0.4rem' }}>
                                                             <button onClick={() => handleAction(p.id, 'TITLE_APPROVED')} style={{ flex: 1, background: '#DCFCE7', color: '#15803D', border: '1px solid #BBF7D0', padding: '0.4rem', fontSize: '0.73rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>✓ Approve</button>
                                                             <button onClick={() => handleAction(p.id, 'CHANGES_REQUESTED')} style={{ flex: 1, background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A', padding: '0.4rem', fontSize: '0.73rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>↩ Revision</button>
                                                             <button onClick={() => handleAction(p.id, 'TITLE_REJECTED')} style={{ flex: 1, background: '#FEE2E2', color: '#DC2626', border: '1px solid #FECACA', padding: '0.4rem', fontSize: '0.73rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>✗ Reject</button>
                                                         </div>
-                                                    </>
-                                                )}
+                                                    )}
 
-                                                {/* First Review marks entry */}
-                                                {p.status === 'FIRST_REVIEW_PENDING' && (
-                                                    <>
-                                                        {showReviewForm === 'first'
-                                                            ? <ReviewMarksForm projectId={p.id} criteria={FIRST_REVIEW_CRITERIA} marks={firstMarks} setMarks={setFirstMarks} onSubmit={() => handleFirstReview(p.id)} title="First Review Marks (out of 100 → 20)" />
-                                                            : <button onClick={() => setActiveReviewForm(pr => ({ ...pr, [p.id]: 'first' }))} style={{ background: '#F3E8FF', color: '#7C3AED', border: '1px solid #DDD6FE', padding: '0.5rem', fontSize: '0.78rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
-                                                                <Star size={14} fill="#7C3AED" color="#7C3AED" /> Enter First Review Marks
-                                                            </button>
-                                                        }
-                                                    </>
-                                                )}
+                                                    {/* First Review marks entry */}
+                                                    {p.status === 'FIRST_REVIEW_PENDING' && !p.firstReview && (
+                                                        <>
+                                                            {showReviewForm === 'first'
+                                                                ? <ReviewMarksForm projectId={p.id} criteria={FIRST_REVIEW_CRITERIA} marks={firstMarks} setMarks={setFirstMarks} onSubmit={() => handleFirstReview(p.id)} onCancel={() => setActiveReviewForm(null)} title="First Review Marks (out of 100 → 20)" />
+                                                                : <button onClick={() => setActiveReviewForm(pr => ({ ...pr, [p.id]: 'first' }))} style={{ background: '#F3E8FF', color: '#7C3AED', border: '1px solid #DDD6FE', padding: '0.5rem', fontSize: '0.78rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+                                                                    <Star size={14} fill="#7C3AED" color="#7C3AED" /> Enter First Review Marks
+                                                                </button>
+                                                            }
+                                                        </>
+                                                    )}
 
-                                                {/* Second Review marks entry */}
-                                                {p.status === 'FIRST_REVIEW_DONE' && (
-                                                    <>
-                                                        {showReviewForm === 'second'
-                                                            ? <ReviewMarksForm projectId={p.id} criteria={SECOND_REVIEW_CRITERIA} marks={secondMarks} setMarks={setSecondMarks} onSubmit={() => handleSecondReview(p.id)} title="Second Review Marks (out of 100 → 20)" />
-                                                            : <button onClick={() => setActiveReviewForm(pr => ({ ...pr, [p.id]: 'second' }))} style={{ background: '#F3E8FF', color: '#7C3AED', border: '1px solid #DDD6FE', padding: '0.5rem', fontSize: '0.78rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
-                                                                <Award size={14} color="#7C3AED" /> Enter Second Review Marks
-                                                            </button>
-                                                        }
-                                                    </>
-                                                )}
+                                                    {/* Second Review marks entry */}
+                                                    {p.status === 'FIRST_REVIEW_DONE' && !p.secondReview && (
+                                                        <>
+                                                            {showReviewForm === 'second'
+                                                                ? <ReviewMarksForm projectId={p.id} criteria={SECOND_REVIEW_CRITERIA} marks={secondMarks} setMarks={setSecondMarks} onSubmit={() => handleSecondReview(p.id)} onCancel={() => setActiveReviewForm(null)} title="Second Review Marks (out of 100 → 20)" />
+                                                                : <button onClick={() => setActiveReviewForm(pr => ({ ...pr, [p.id]: 'second' }))} style={{ background: '#F3E8FF', color: '#7C3AED', border: '1px solid #DDD6FE', padding: '0.5rem', fontSize: '0.78rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+                                                                    <Award size={14} color="#7C3AED" /> Enter Second Review Marks
+                                                                </button>
+                                                            }
+                                                        </>
+                                                    )}
 
-                                                {/* Final submission review */}
-                                                {p.status === 'PROJECT_SUBMITTED' && (
-                                                    <div style={{ display: 'flex', gap: '0.4rem' }}>
-                                                        <button onClick={() => handleAction(p.id, 'DOCUMENTS_VERIFIED')} style={{ flex: 1, background: '#DCFCE7', color: '#15803D', border: '1px solid #BBF7D0', padding: '0.4rem', fontSize: '0.73rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>✓ Verify Docs</button>
-                                                        <button onClick={() => handleAction(p.id, 'CHANGES_REQUESTED')} style={{ flex: 1, background: '#FEE2E2', color: '#DC2626', border: '1px solid #FECACA', padding: '0.4rem', fontSize: '0.73rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>✗ Changes</button>
-                                                    </div>
-                                                )}
+                                                    {/* Final submission review */}
+                                                    {p.status === 'PROJECT_SUBMITTED' && (
+                                                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                                            <button onClick={() => handleAction(p.id, 'DOCUMENTS_VERIFIED')} style={{ flex: 1, background: '#DCFCE7', color: '#15803D', border: '1px solid #BBF7D0', padding: '0.4rem', fontSize: '0.73rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>✓ Verify Docs</button>
+                                                            <button onClick={() => handleAction(p.id, 'REPORT_CHANGES_REQUESTED')} style={{ flex: 1, background: '#FEE2E2', color: '#DC2626', border: '1px solid #FECACA', padding: '0.4rem', fontSize: '0.73rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}>✗ Changes</button>
+                                                        </div>
+                                                    )}
 
-                                                {p.status === 'DOCUMENTS_VERIFIED' && (
-                                                    <button onClick={() => handleAction(p.id, 'PROJECT_COMPLETED')} style={{ background: '#DCFCE7', color: '#15803D', border: '1px solid #BBF7D0', padding: '0.5rem', fontSize: '0.78rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', cursor: 'pointer', width: '100%' }}>🎓 Mark Project Complete</button>
-                                                )}
+                                                    {p.status === 'DOCUMENTS_VERIFIED' && (
+                                                        <>
+                                                            {!p.vivaScore ? (
+                                                                showReviewForm === 'viva' ? (
+                                                                    <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', marginTop: '0.5rem' }}>
+                                                                        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>
+                                                                            Viva Score (out of 20)
+                                                                        </label>
+                                                                        <input
+                                                                            type="number" min={0} max={20}
+                                                                            value={vivaMarks[p.id] || ''}
+                                                                            onChange={e => setVivaMarks(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                                                            className="saas-input"
+                                                                            style={{ padding: '0.35rem 0.6rem', fontSize: '0.9rem', marginBottom: '0.5rem' }}
+                                                                        />
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                                                                            <button onClick={() => setActiveReviewForm(null)} style={{ padding: '0.4rem 0.75rem', background: 'white', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}>Cancel</button>
+                                                                            <button onClick={() => handleVivaScore(p.id)} className="btn-primary" style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Save Viva Score</button>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <button onClick={() => setActiveReviewForm(pr => ({ ...pr, [p.id]: 'viva' }))} style={{ background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE', padding: '0.5rem', fontSize: '0.78rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center', marginBottom: '0.5rem' }}>
+                                                                        <Award size={14} color="#2563EB" /> Enter Viva Score
+                                                                    </button>
+                                                                )
+                                                            ) : (
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: '#F8FAFC', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', marginBottom: '0.5rem', fontSize: '0.8rem', fontWeight: 600 }}>
+                                                                    <span>Viva Score</span>
+                                                                    <span style={{ color: 'var(--primary)' }}>{p.vivaScore.marks}/20</span>
+                                                                </div>
+                                                            )}
+                                                            <button onClick={() => handleAction(p.id, 'PENDING_ADMIN_APPROVAL')} style={{ background: '#DCFCE7', color: '#15803D', border: '1px solid #BBF7D0', padding: '0.5rem', fontSize: '0.78rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', cursor: 'pointer', width: '100%' }}>🎓 Request Admin Final Verification</button>
+                                                        </>
+                                                    )}
 
-                                                {p.status === 'TITLE_APPROVED' && (
-                                                    <div style={{ background: '#F0FDF4', border: '1px dashed #BBF7D0', borderRadius: 'var(--radius-sm)', padding: '0.5rem', fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-                                                        <Clock size={12} style={{ display: 'inline', marginRight: '4px' }} /> Awaiting CSC committee review
-                                                    </div>
-                                                )}
+                                                    {p.status === 'TITLE_APPROVED' && (
+                                                        <div style={{ background: '#F0FDF4', border: '1px dashed #BBF7D0', borderRadius: 'var(--radius-sm)', padding: '0.5rem', fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                                                            <Clock size={12} style={{ display: 'inline', marginRight: '4px' }} /> Awaiting CSC committee review
+                                                        </div>
+                                                    )}
 
-                                                {p.status === 'SECOND_REVIEW_DONE' && (
-                                                    <div style={{ background: '#F0FDF4', border: '1px dashed #BBF7D0', borderRadius: 'var(--radius-sm)', padding: '0.5rem', fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-                                                        <Clock size={12} style={{ display: 'inline', marginRight: '4px' }} /> Awaiting student final report submission
-                                                    </div>
-                                                )}
+                                                    {p.status === 'SECOND_REVIEW_DONE' && (
+                                                        <div style={{ background: '#F0FDF4', border: '1px dashed #BBF7D0', borderRadius: 'var(--radius-sm)', padding: '0.5rem', fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                                                            <Clock size={12} style={{ display: 'inline', marginRight: '4px' }} /> Awaiting student final report submission
+                                                        </div>
+                                                    )}
+
+                                                    {p.status === 'REPORT_CHANGES_REQUESTED' && (
+                                                        <div style={{ background: '#FEF2F2', border: '1px dashed #FECACA', borderRadius: 'var(--radius-sm)', padding: '0.5rem', fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                                                            <Clock size={12} style={{ display: 'inline', marginRight: '4px' }} /> Awaiting student revised report
+                                                        </div>
+                                                    )}
+
+                                                    {p.status === 'PENDING_ADMIN_APPROVAL' && (
+                                                        <div style={{ background: '#F0FDF4', border: '1px dashed #BBF7D0', borderRadius: 'var(--radius-sm)', padding: '0.5rem', fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                                                            <Clock size={12} style={{ display: 'inline', marginRight: '4px' }} /> Awaiting Admin final verification
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
-                                {colProposals.length === 0 && (
-                                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem', padding: '2rem 1rem' }}>No projects</div>
-                                )}
+                                        );
+                                    })}
+                                    {colProposals.length === 0 && (
+                                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem', padding: '2rem 1rem' }}>No projects</div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    );
-                })}
-            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 };

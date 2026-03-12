@@ -1,25 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { AlertCircle, Layout } from 'lucide-react';
+import { AlertCircle, Layout, RefreshCw, ShieldCheck } from 'lucide-react';
+
+// ── Captcha helpers ────────────────────────────────────────────────
+const generateCaptcha = () => {
+    const a = Math.floor(Math.random() * 9) + 1;
+    const b = Math.floor(Math.random() * 9) + 1;
+    const useAdd = Math.random() > 0.4;
+    if (useAdd) {
+        return { question: `${a} + ${b}`, answer: a + b };
+    } else {
+        const big = Math.max(a, b), small = Math.min(a, b);
+        return { question: `${big} − ${small}`, answer: big - small };
+    }
+};
 
 const Login = () => {
-    const [email, setEmail] = useState('');
+    const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // Captcha state
+    const [captcha, setCaptcha] = useState(generateCaptcha);
+    const [captchaInput, setCaptchaInput] = useState('');
+    const [captchaError, setCaptchaError] = useState('');
+
     const { login } = useAuth();
     const navigate = useNavigate();
+
+    const refreshCaptcha = useCallback(() => {
+        setCaptcha(generateCaptcha());
+        setCaptchaInput('');
+        setCaptchaError('');
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        setCaptchaError('');
 
-        if (!email.trim()) { setError('Please enter your email.'); return; }
+        if (!identifier.trim()) { setError('Please enter your Roll Number or Email.'); return; }
         if (!password) { setError('Please enter your password.'); return; }
 
+        // Validate CAPTCHA
+        if (captchaInput.trim() === '') {
+            setCaptchaError('Please solve the security question.');
+            return;
+        }
+        if (parseInt(captchaInput.trim(), 10) !== captcha.answer) {
+            setCaptchaError('Incorrect answer. Please try again.');
+            refreshCaptcha();
+            return;
+        }
+
         setLoading(true);
-        const result = await login({ email: email.trim() }, password);
+        const result = await login({ identifier: identifier.trim() }, password);
         setLoading(false);
 
         if (result.success) {
@@ -29,6 +66,7 @@ const Login = () => {
             else navigate('/student-dashboard');
         } else {
             setError(result.error);
+            refreshCaptcha();
         }
     };
 
@@ -43,15 +81,15 @@ const Login = () => {
                 <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
                     <div style={{
                         display: 'inline-flex', alignItems: 'center', gap: '0.75rem',
-                        fontWeight: 700, fontSize: '1.6rem', color: 'var(--text-main)',
+                        fontWeight: 700, fontSize: '2.6rem', color: 'var(--text-main)',
                     }}>
                         <div style={{ background: 'var(--primary)', color: 'white', padding: '10px', borderRadius: '12px', display: 'flex' }}>
                             <Layout size={26} />
                         </div>
-                        <span>Project<span style={{ color: 'var(--primary)' }}>Tracker</span></span>
+                        <span>Pro<span style={{ color: 'var(--primary)' }}>Track</span></span>
                     </div>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.6rem' }}>
-                        University Student Project Portal
+                        SMART ACADAMIC PROJECT MONITORING AND DASHBOARDS SYSTEMS
                     </p>
                 </div>
 
@@ -74,16 +112,16 @@ const Login = () => {
                     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-main)' }}>
-                                Email Address
+                                Roll Number / Email Address
                             </label>
                             <input
                                 className="saas-input"
-                                type="email"
-                                id="email"
-                                value={email}
-                                onChange={e => setEmail(e.target.value)}
-                                placeholder="name@college.edu"
-                                autoComplete="email"
+                                type="text"
+                                id="identifier"
+                                value={identifier}
+                                onChange={e => setIdentifier(e.target.value)}
+
+                                autoComplete="username"
                                 autoFocus
                             />
                         </div>
@@ -106,9 +144,66 @@ const Login = () => {
                                 id="password"
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
-                                placeholder="••••••••"
+                                placeholder=""
                                 autoComplete="current-password"
                             />
+                        </div>
+
+                        {/* ── CAPTCHA ── */}
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-main)' }}>
+                                Security Check
+                            </label>
+                            <div style={{
+                                display: 'flex', alignItems: 'center', gap: '0.75rem',
+                                background: 'var(--bg-card, rgba(255,255,255,0.04))',
+                                border: captchaError
+                                    ? '1.5px solid rgba(239,68,68,0.6)'
+                                    : '1.5px solid var(--border, rgba(255,255,255,0.08))',
+                                borderRadius: 'var(--radius-sm, 8px)',
+                                padding: '0.6rem 0.85rem',
+                            }}>
+                                <ShieldCheck size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                                <span style={{
+                                    fontFamily: 'monospace', fontSize: '1.05rem', fontWeight: 700,
+                                    color: 'var(--text-main)', letterSpacing: '0.08em',
+                                    background: 'var(--primary-soft, rgba(99,102,241,0.12))',
+                                    padding: '0.2rem 0.6rem', borderRadius: '6px',
+                                    userSelect: 'none', flexShrink: 0,
+                                }}>
+                                    {captcha.question} = ?
+                                </span>
+                                <input
+                                    className="saas-input"
+                                    id="captcha-input"
+                                    type="number"
+                                    value={captchaInput}
+                                    onChange={e => { setCaptchaInput(e.target.value); setCaptchaError(''); }}
+                                    placeholder="Answer"
+                                    style={{ flex: 1, minWidth: 0, margin: 0 }}
+                                    autoComplete="off"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={refreshCaptcha}
+                                    title="Get a new question"
+                                    style={{
+                                        background: 'none', border: 'none', cursor: 'pointer',
+                                        color: 'var(--text-muted)', padding: '4px', display: 'flex',
+                                        borderRadius: '6px', transition: 'color 0.2s',
+                                        flexShrink: 0,
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
+                                    onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                                >
+                                    <RefreshCw size={16} />
+                                </button>
+                            </div>
+                            {captchaError && (
+                                <p style={{ color: '#ef4444', fontSize: '0.78rem', marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                    <AlertCircle size={12} /> {captchaError}
+                                </p>
+                            )}
                         </div>
 
                         <button
@@ -123,8 +218,14 @@ const Login = () => {
                     </form>
                 </div>
 
-                <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.8rem', color: 'var(--text-muted)', opacity: 0.8 }}>
-                    Accounts are created by the system administrator only.
+                <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    New student?{' '}
+                    <Link to="/signup" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>
+                        Create your account →
+                    </Link>
+                </p>
+                <p style={{ textAlign: 'center', marginTop: '0.4rem', fontSize: '0.78rem', color: 'var(--text-muted)', opacity: 0.7 }}>
+                    Staff accounts are created by the administrator only.
                 </p>
             </div>
         </div>
