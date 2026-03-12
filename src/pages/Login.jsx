@@ -81,15 +81,15 @@ const Login = () => {
                 <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
                     <div style={{
                         display: 'inline-flex', alignItems: 'center', gap: '0.75rem',
-                        fontWeight: 700, fontSize: '1.6rem', color: 'var(--text-main)',
+                        fontWeight: 700, fontSize: '2.6rem', color: 'var(--text-main)',
                     }}>
                         <div style={{ background: 'var(--primary)', color: 'white', padding: '10px', borderRadius: '12px', display: 'flex' }}>
                             <Layout size={26} />
                         </div>
-                        <span>Project<span style={{ color: 'var(--primary)' }}>Tracker</span></span>
+                        <span>Pro<span style={{ color: 'var(--primary)' }}>Track</span></span>
                     </div>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.6rem' }}>
-                        University Student Project Portal
+                        SMART ACADAMIC PROJECT MONITORING AND DASHBOARDS SYSTEMS
                     </p>
                 </div>
 
@@ -120,7 +120,7 @@ const Login = () => {
                                 id="identifier"
                                 value={identifier}
                                 onChange={e => setIdentifier(e.target.value)}
-                                placeholder="26MCA0001 or name@college.edu"
+
                                 autoComplete="username"
                                 autoFocus
                             />
@@ -144,7 +144,7 @@ const Login = () => {
                                 id="password"
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
-                                placeholder="••••••••"
+                                placeholder=""
                                 autoComplete="current-password"
                             />
                         </div>

@@ -92,9 +92,18 @@ export const ProjectService = {
         } catch (error) { return []; }
     },
 
-    submitProposal: async (studentId, studentName, proposalData) => {
+    submitProposal: async (studentId, studentName, proposalData, abstractFile) => {
         try {
-            const { data } = await API.post('/projects', { ...proposalData, studentId, studentName });
+            const formData = new FormData();
+            formData.append('studentId', studentId);
+            formData.append('studentName', studentName);
+            for (const key in proposalData) {
+                if (proposalData[key]) formData.append(key, proposalData[key]);
+            }
+            if (abstractFile) {
+                formData.append('abstractFile', abstractFile);
+            }
+            const { data } = await API.post('/projects', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
             return { success: true, data: normalize(data) };
         } catch (error) {
             return { success: false, error: error.response?.data?.message || 'Submission failed' };
@@ -142,6 +151,16 @@ export const ProjectService = {
             return { success: true, data: normalize(data) };
         } catch (error) {
             return { success: false, error: error.response?.data?.message || 'Second review submission failed' };
+        }
+    },
+
+    // Viva Score marks (Guide)
+    submitVivaScore: async (projectId, marks, actorName, actorId) => {
+        try {
+            const { data } = await API.put(`/projects/${projectId}/viva-score`, { marks, actorName, actorId });
+            return { success: true, data: normalize(data) };
+        } catch (error) {
+            return { success: false, error: error.response?.data?.message || 'Viva score submission failed' };
         }
     },
 

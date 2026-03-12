@@ -31,7 +31,9 @@ const STATUS_META = {
     'FIRST_REVIEW_DONE': { label: 'First Review Done', color: '#22C55E', bg: '#DCFCE7', step: 4 },
     'SECOND_REVIEW_DONE': { label: 'Second Review Done', color: '#22C55E', bg: '#DCFCE7', step: 5 },
     'PROJECT_SUBMITTED': { label: 'Final Report Submitted', color: '#3B82F6', bg: '#EFF6FF', step: 6 },
+    'REPORT_CHANGES_REQUESTED': { label: 'Report Changes Requested', color: '#F59E0B', bg: '#FEF3C7', step: 5 },
     'DOCUMENTS_VERIFIED': { label: 'Documents Verified', color: '#22C55E', bg: '#DCFCE7', step: 6 },
+    'PENDING_ADMIN_APPROVAL': { label: 'Pending Admin Approval', color: '#8B5CF6', bg: '#F3E8FF', step: 6 },
     'PROJECT_COMPLETED': { label: 'Project Completed', color: '#16A34A', bg: '#DCFCE7', step: 7 },
 };
 
@@ -85,6 +87,7 @@ const StudentDashboard = () => {
     const [selectedProject, setSelectedProject] = useState(null);
     const fileInputRef = React.useRef(null);
     const [uploadType, setUploadType] = useState(null);
+    const [abstractFile, setAbstractFile] = useState(null);
     const [formData, setFormData] = useState({ title: '', domain: '', techStack: '', abstract: '', guideId: '', guideName: '' });
     const [activeTab, setActiveTab] = useState('details');
     const [formError, setFormError] = useState('');
@@ -131,12 +134,13 @@ const StudentDashboard = () => {
             guideId: user?.assignedGuideId || '',
             guideName: user?.assignedGuideName || ''
         });
-        setSelectedProject(null); setFormError(''); setView('create');
+        setSelectedProject(null); setFormError(''); setAbstractFile(null); setView('create');
     };
 
     const handleViewProject = (project) => {
         setSelectedProject(project);
         setFormData({ title: project.title, domain: project.domain, techStack: project.techStack, abstract: project.abstract, guideId: project.guideId || '', guideName: project.guideName || '' });
+        setAbstractFile(null);
         setView('details'); setActiveTab('details');
     };
 
@@ -160,7 +164,7 @@ const StudentDashboard = () => {
         if (!selectedProject && !finalGuideId) { setFormError('Please select a project guide.'); return; }
 
         const payload = selectedProject ? { ...formData, id: selectedProject.id } : { ...formData, guideId: finalGuideId, guideName: formData.guideName || user?.assignedGuideName };
-        const response = await ProjectService.submitProposal(user.id, user.name, payload);
+        const response = await ProjectService.submitProposal(user.id, user.name, payload, abstractFile);
 
         if (response.success) {
             loadProposals();
@@ -186,7 +190,7 @@ const StudentDashboard = () => {
         const file = e.target.files[0];
         if (!file || !selectedProject) return;
         if (uploadType === 'code' && !file.name.endsWith('.zip')) return alert('Upload a .zip file.');
-        if (uploadType === 'report' && !file.name.endsWith('.pdf')) return alert('Upload a .pdf file.');
+        if (uploadType !== 'code' && !file.name.endsWith('.pdf')) return alert('Upload a .pdf file.');
         const response = await ProjectService.uploadFile(selectedProject.id, uploadType, file);
         if (response.success) { setSelectedProject(response.data); setProposals(prev => prev.map(p => p.id === response.data.id ? response.data : p)); }
         else alert('Upload Failed: ' + response.error);
@@ -368,10 +372,11 @@ const StudentDashboard = () => {
                                 <h3 style={{ fontSize: '1rem', lineHeight: 1.4, margin: 0 }}>{p.title}</h3>
                                 <p style={{ fontSize: '0.83rem', color: 'var(--text-muted)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', margin: 0 }}>{p.abstract}</p>
                                 {/* Mini review scores */}
-                                {(p.firstReview || p.secondReview) && (
-                                    <div style={{ display: 'flex', gap: '1rem', padding: '0.5rem 0.75rem', background: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                                {(p.firstReview || p.secondReview || p.vivaScore) && (
+                                    <div style={{ display: 'flex', gap: '1rem', padding: '0.5rem 0.75rem', background: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', flexWrap: 'wrap' }}>
                                         {p.firstReview && <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)' }}>Review 1: {p.firstReview.normalizedOutOf20}/20</span>}
                                         {p.secondReview && <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--success)' }}>Review 2: {p.secondReview.normalizedOutOf20}/20</span>}
+                                        {p.vivaScore && <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#2563EB' }}>Viva: {p.vivaScore.marks}/20</span>}
                                     </div>
                                 )}
                                 <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
@@ -435,8 +440,13 @@ const StudentDashboard = () => {
                         </div>
 
                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 500 }}>Abstract</label>
-                            <textarea name="abstract" value={formData.abstract} onChange={handleChange} required className="saas-input" rows={5} placeholder="Describe your project — existing system, proposed system, objectives…" />
+                            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 500 }}>Abstract Text</label>
+                            <textarea name="abstract" value={formData.abstract} onChange={handleChange} required className="saas-input" rows={4} placeholder="Brief textual abstract..." />
+                        </div>
+
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', fontWeight: 500 }}>Abstract Document (.pdf)</label>
+                            <input type="file" accept=".pdf" onChange={e => setAbstractFile(e.target.files[0])} required={!selectedProject} className="saas-input" style={{ padding: '0.5rem' }} />
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -450,9 +460,9 @@ const StudentDashboard = () => {
 
     // ── DETAILS VIEW ────────────────────────────────────────────
     if (!selectedProject) return null;
-    const canUpload = ['TITLE_APPROVED', 'FIRST_REVIEW_PENDING', 'FIRST_REVIEW_DONE', 'SECOND_REVIEW_DONE', 'CHANGES_REQUESTED', 'RESUBMITTED'].includes(selectedProject.status);
+    const canUpload = ['TITLE_PENDING', 'TITLE_APPROVED', 'FIRST_REVIEW_PENDING', 'FIRST_REVIEW_DONE', 'SECOND_REVIEW_DONE', 'CHANGES_REQUESTED', 'RESUBMITTED', 'REPORT_CHANGES_REQUESTED'].includes(selectedProject.status);
     const canResubmit = ['CHANGES_REQUESTED', 'TITLE_REJECTED', 'CSC_NOT_APPROVED'].includes(selectedProject.status);
-    const isSubmitted = ['PROJECT_SUBMITTED', 'DOCUMENTS_VERIFIED', 'PROJECT_COMPLETED'].includes(selectedProject.status);
+    const isSubmitted = ['PROJECT_SUBMITTED', 'DOCUMENTS_VERIFIED', 'PROJECT_COMPLETED', 'PENDING_ADMIN_APPROVAL'].includes(selectedProject.status);
 
     return (
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
@@ -502,8 +512,12 @@ const StudentDashboard = () => {
                                             {PROJECT_DOMAINS.map(d => <option key={d} value={d}>{d}</option>)}
                                         </select>
                                         <textarea name="abstract" value={formData.abstract} onChange={handleChange} className="saas-input" rows={3} placeholder="Updated abstract…" />
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                            <label style={{ fontSize: '0.9rem', fontWeight: 500 }}>Upload New Details (.pdf) (Optional):</label>
+                                            <input type="file" accept=".pdf" onChange={e => setAbstractFile(e.target.files[0])} className="saas-input" style={{ flex: 1, padding: '0.4rem' }} />
+                                        </div>
                                         {formError && <p style={{ color: '#ef4444', fontSize: '0.8rem' }}>{formError}</p>}
-                                        <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-end' }}>Resubmit</button>
+                                        <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-end', padding: '0.5rem 1.5rem' }}>Resubmit Proposal</button>
                                     </form>
                                 </div>
                             )}
@@ -526,9 +540,13 @@ const StudentDashboard = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
                                 <Award size={20} color="var(--primary)" />
                                 <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>Review Scores</h3>
-                                {(selectedProject.firstReview || selectedProject.secondReview) && (
+                                {(selectedProject.firstReview || selectedProject.secondReview || selectedProject.vivaScore) && (
                                     <span style={{ marginLeft: 'auto', fontWeight: 700, color: 'var(--primary)' }}>
-                                        Total: {((selectedProject.firstReview?.normalizedOutOf20 || 0) + (selectedProject.secondReview?.normalizedOutOf20 || 0)).toFixed(1)} / 40
+                                        Total: {(
+                                            (selectedProject.firstReview?.normalizedOutOf20 || 0) + 
+                                            (selectedProject.secondReview?.normalizedOutOf20 || 0) + 
+                                            ((selectedProject.vivaScore?.marks || 0) * 3)
+                                        ).toFixed(1)} / 100
                                     </span>
                                 )}
                             </div>
@@ -541,6 +559,23 @@ const StudentDashboard = () => {
                                 <>
                                     <ReviewScoreCard title="First Review (20 Marks)" review={selectedProject.firstReview} />
                                     <ReviewScoreCard title="Second Review (20 Marks)" review={selectedProject.secondReview} />
+                                    {selectedProject.vivaScore && (
+                                        <div style={{ padding: '1.25rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: '#F8FAFC', marginTop: '1rem' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+                                                <h4 style={{ fontSize: '0.95rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <Award size={16} color="#3B82F6" /> Viva-Voce (60 Marks)
+                                                </h4>
+                                                <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#2563EB' }}>
+                                                    {(selectedProject.vivaScore.marks * 3).toFixed(1)}
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, marginLeft: '0.2rem' }}>/ 60</span>
+                                                </span>
+                                            </div>
+                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-main)', background: 'white', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                                                <div style={{ fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem', textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.05em' }}>Examiner Comment</div>
+                                                {selectedProject.vivaScore.comment || 'No comments provided.'}
+                                            </div>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -558,6 +593,8 @@ const StudentDashboard = () => {
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                     {[
+                                        { key: 'firstReview', label: 'First Review Document (.pdf)', desc: 'Literature & Problem Definition', icon: <FileText size={20} color="var(--primary)" />, color: '#EFF6FF', ext: '.pdf' },
+                                        { key: 'secondReview', label: 'Second Review Document (.pdf)', desc: 'Design & Code Modules', icon: <FileText size={20} color="var(--primary)" />, color: '#EFF6FF', ext: '.pdf' },
                                         { key: 'code', label: 'Source Code (.zip)', desc: 'Full project codebase', icon: <Code size={20} color="var(--primary)" />, color: '#EFF6FF', ext: '.zip' },
                                         { key: 'report', label: 'Project Report (.pdf)', desc: 'Final documentation and thesis', icon: <FileText size={20} color="var(--danger)" />, color: '#FEE2E2', ext: '.pdf' },
                                     ].map(({ key, label, desc, icon, color }) => (
@@ -572,7 +609,7 @@ const StudentDashboard = () => {
                                             }
                                         </div>
                                     ))}
-                                    {!isSubmitted && selectedProject.repository?.code && selectedProject.repository?.report && selectedProject.status === 'SECOND_REVIEW_DONE' && (
+                                    {!isSubmitted && selectedProject.repository?.code && selectedProject.repository?.report && ['SECOND_REVIEW_DONE', 'REPORT_CHANGES_REQUESTED'].includes(selectedProject.status) && (
                                         <div style={{ marginTop: '1rem', padding: '1.5rem', background: '#F8FAFC', borderRadius: 'var(--radius-md)', textAlign: 'center', border: '1px solid var(--border-color)' }}>
                                             <h4 style={{ marginBottom: '0.5rem' }}>Ready for Final Submission</h4>
                                             <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>Both files uploaded. Submit for Viva-Voce examination.</p>

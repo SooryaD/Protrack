@@ -77,7 +77,9 @@ const importData = async () => {
             { rollNo: '26MCA0017', name: 'Suresh N' },
             { rollNo: '26MCA0018', name: 'Anitha K' },
             { rollNo: '26MCA0019', name: 'Bala M' },
-            { rollNo: '26MCA0020', name: 'Celsia R' },
+            { rollNo: '2435MCA0059', name: 'Parthiban Raj D' },
+
+
         ];
 
         for (const s of studentRegistry) {

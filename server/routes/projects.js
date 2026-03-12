@@ -15,7 +15,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-const UPLOAD_ALLOWED_STATUSES = ['TITLE_APPROVED', 'CHANGES_REQUESTED', 'RESUBMITTED', 'FIRST_REVIEW_DONE', 'SECOND_REVIEW_DONE'];
+const UPLOAD_ALLOWED_STATUSES = ['TITLE_PENDING', 'TITLE_APPROVED', 'CHANGES_REQUESTED', 'RESUBMITTED', 'FIRST_REVIEW_PENDING', 'FIRST_REVIEW_DONE', 'SECOND_REVIEW_DONE', 'REPORT_CHANGES_REQUESTED'];
 
 // @route   POST /api/projects/:id/upload
 router.post('/:id/upload', upload.single('file'), async (req, res) => {
@@ -24,12 +24,17 @@ router.post('/:id/upload', upload.single('file'), async (req, res) => {
         const project = await Project.findById(req.params.id);
         if (!project) return res.status(404).json({ message: 'Project not found' });
         if (project.status === 'PROJECT_SUBMITTED') return res.status(400).json({ message: 'Project already submitted. Files cannot be modified.' });
-        if (!UPLOAD_ALLOWED_STATUSES.includes(project.status)) return res.status(400).json({ message: `Files can only be uploaded after title is approved. Current status: ${project.status}` });
+        if (!UPLOAD_ALLOWED_STATUSES.includes(project.status)) return res.status(400).json({ message: `Files can only be uploaded at appropriate stages. Current status: ${project.status}` });
 
         const filePath = `uploads/${req.file.filename}`;
         if (!project.repository) project.repository = {};
+        
         if (type === 'code') project.repository.code = filePath;
         else if (type === 'report') project.repository.report = filePath;
+        else if (type === 'abstract') project.repository.abstract = filePath;
+        else if (type === 'firstReview') project.repository.firstReview = filePath;
+        else if (type === 'secondReview') project.repository.secondReview = filePath;
+        
         project.repository.lastUpdated = new Date();
 
         const updatedProject = await project.save();
@@ -50,7 +55,7 @@ router.get('/', async (req, res) => {
 });
 
 // @route   POST /api/projects  — Create or Resubmit
-router.post('/', async (req, res) => {
+router.post('/', upload.single('abstractFile'), async (req, res) => {
     const { studentId, studentName, guideId, guideName, title, domain, techStack, abstract, id } = req.body;
 
     // Validate title length (minimum 7 words)
@@ -93,6 +98,11 @@ router.post('/', async (req, res) => {
         if (['CHANGES_REQUESTED', 'TITLE_REJECTED'].includes(project.status)) {
             project.status = 'RESUBMITTED';
         }
+        if (req.file) {
+            if (!project.repository) project.repository = {};
+            project.repository.abstract = `uploads/${req.file.filename}`;
+            project.repository.lastUpdated = new Date();
+        }
 
         project.history.push({ date: new Date(), action: 'RESUBMITTED', by: 'Student', comment: 'Project details updated.' });
         return res.json(await project.save());
@@ -104,6 +114,9 @@ router.post('/', async (req, res) => {
             history: [{ date: new Date(), action: 'SUBMITTED', by: 'Student', comment: 'Project proposal submitted for guide approval.' }]
         });
         if (guideName) project.guideName = guideName; // explicit
+        if (req.file) {
+            project.repository = { abstract: `uploads/${req.file.filename}`, lastUpdated: new Date() };
+        }
         res.status(201).json(await project.save());
     }
 });
@@ -115,11 +128,11 @@ router.put('/:id/status', async (req, res) => {
         const project = await Project.findById(req.params.id);
         if (!project) return res.status(404).json({ message: 'Project not found' });
 
-        if (actorRole === 'admin') return res.status(403).json({ message: 'Admins use the CSC review endpoint.' });
-        if (status === 'PROJECT_COMPLETED' && project.status !== 'DOCUMENTS_VERIFIED') return res.status(400).json({ message: 'Project can only be completed after documents are verified.' });
+        if (actorRole === 'admin' && status !== 'PROJECT_COMPLETED') return res.status(403).json({ message: 'Admins use the CSC review endpoint.' });
+        if (status === 'PROJECT_COMPLETED' && project.status !== 'PENDING_ADMIN_APPROVAL') return res.status(400).json({ message: 'Project can only be completed by Admin after PENDING_ADMIN_APPROVAL.' });
         if (status === 'PROJECT_SUBMITTED' && actorRole === 'student' && project.studentId === actorId) {
             // OK — student submitting their own project
-        } else if (project.guideId.toString() !== actorId) {
+        } else if (actorRole !== 'admin' && project.guideId.toString() !== actorId) {
             return res.status(403).json({ message: 'Unauthorized: You are not the assigned guide.' });
         }
 
@@ -222,6 +235,30 @@ router.put('/:id/second-review', async (req, res) => {
         };
         project.status = 'SECOND_REVIEW_DONE';
         project.history.push({ date: new Date(), action: 'SECOND_REVIEW_DONE', by: actorName, comment: `Second review submitted. Score: ${normalized}/20` });
+        res.json(await project.save());
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @route   PUT /api/projects/:id/viva-score  — Guide enters Viva Score marks
+router.put('/:id/viva-score', async (req, res) => {
+    const { marks, actorName, actorId } = req.body;
+    try {
+        const project = await Project.findById(req.params.id);
+        if (!project) return res.status(404).json({ message: 'Project not found' });
+
+        if (project.guideId.toString() !== actorId) return res.status(403).json({ message: 'Unauthorized: You are not the assigned guide.' });
+        if (!['DOCUMENTS_VERIFIED', 'PROJECT_COMPLETED'].includes(project.status)) {
+            return res.status(400).json({ message: 'Viva score can only be entered after documents are verified.' });
+        }
+
+        project.vivaScore = {
+            marks,
+            submittedAt: new Date(),
+            submittedBy: actorName
+        };
+        project.history.push({ date: new Date(), action: 'VIVA_SCORE_ADDED', by: actorName, comment: `Viva marks submitted: ${marks}/20` });
         res.json(await project.save());
     } catch (error) {
         res.status(500).json({ message: error.message });

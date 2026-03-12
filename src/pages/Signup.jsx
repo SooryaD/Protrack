@@ -88,12 +88,12 @@ const Signup = () => {
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <div style={{
                         display: 'inline-flex', alignItems: 'center', gap: '0.75rem',
-                        fontWeight: 700, fontSize: '1.6rem', color: 'var(--text-main)',
+                        fontWeight: 700, fontSize: '2.6rem', color: 'var(--text-main)',
                     }}>
                         <div style={{ background: 'var(--primary)', color: 'white', padding: '10px', borderRadius: '12px', display: 'flex' }}>
                             <Layout size={26} />
                         </div>
-                        <span>Project<span style={{ color: 'var(--primary)' }}>Tracker</span></span>
+                        <span>Pro<span style={{ color: 'var(--primary)' }}>Track</span></span>
                     </div>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
                         Student Registration Portal
