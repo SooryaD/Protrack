@@ -49,8 +49,7 @@ const Signup = () => {
         e.preventDefault();
         setError('');
 
-        if (!email.trim()) { setError('Please enter your college email.'); return; }
-        if (!email.trim().endsWith('@college.edu')) { setError('Email must end with @college.edu'); return; }
+        if (!email.trim()) { setError('Please enter your email.'); return; }
         if (!password || password.length < 6) { setError('Password must be at least 6 characters.'); return; }
         if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
 
@@ -226,7 +225,7 @@ const Signup = () => {
                             <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
                                 <div>
                                     <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-main)' }}>
-                                        College Email
+                                        Email Address
                                     </label>
                                     <input
                                         className="saas-input"
@@ -234,13 +233,10 @@ const Signup = () => {
                                         type="email"
                                         value={email}
                                         onChange={e => { setEmail(e.target.value); setError(''); }}
-                                        placeholder="yourname@college.edu"
+                                        placeholder="yourname@gmail.com"
                                         autoFocus
                                         autoComplete="email"
                                     />
-                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
-                                        Must end with <strong>@college.edu</strong>
-                                    </p>
                                 </div>
                                 <div>
                                     <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-main)' }}>

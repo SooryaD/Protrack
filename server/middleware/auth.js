@@ -1,9 +1,6 @@
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
+import { pool } from '../db.js';
 
-/**
- * protect - Verifies JWT Bearer token and attaches decoded user to req.user
- */
 export const protect = async (req, res, next) => {
     let token;
 
@@ -12,24 +9,35 @@ export const protect = async (req, res, next) => {
             token = req.headers.authorization.split(' ')[1];
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret123');
 
-            // Fetch user from DB and attach (exclude sensitive fields)
-            const user = await User.findById(decoded.id);
+            // Fetch user from DB
+            const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [decoded.id]);
+            const user = rows[0];
+            
             if (!user) {
                 return res.status(401).json({ message: 'User not found. Token invalid.' });
             }
 
-            // Attach safe user object — no password, no reset tokens
+            // Fetch assigned guide name if applicable
+            let assignedGuideName = null;
+            if (user.assigned_guide_id) {
+                const [guideRows] = await pool.query('SELECT name FROM users WHERE id = ?', [user.assigned_guide_id]);
+                if (guideRows.length > 0) {
+                    assignedGuideName = guideRows[0].name;
+                }
+            }
+
             req.user = {
-                id: user._id,
+                id: user.id,
+                _id: user.id, // For backward compatibility with React client parsing _id
                 name: user.name,
                 email: user.email,
                 role: user.role,
-                rollNo: user.rollNo || null,
-                assignedGuideId: user.assignedGuideId || null,
-                assignedGuideName: user.assignedGuideName || null,
-                maxStudents: user.maxStudents || null,
-                currentStudentCount: user.currentStudentCount || 0,
-                isActive: user.isActive,
+                rollNo: user.roll_no || null,
+                assignedGuideId: user.assigned_guide_id || null,
+                assignedGuideName: assignedGuideName,
+                maxStudents: user.max_students || null,
+                currentStudentCount: user.current_student_count || 0,
+                isActive: true // Mocking isActive since it's not in the new schema
             };
 
             next();
@@ -43,9 +51,6 @@ export const protect = async (req, res, next) => {
     }
 };
 
-/**
- * adminOnly - Allows only admin role
- */
 export const adminOnly = (req, res, next) => {
     if (req.user && req.user.role === 'admin') {
         next();
@@ -54,9 +59,6 @@ export const adminOnly = (req, res, next) => {
     }
 };
 
-/**
- * staffOrAdmin - Allows staff or admin roles
- */
 export const staffOrAdmin = (req, res, next) => {
     if (req.user && (req.user.role === 'staff' || req.user.role === 'admin')) {
         next();

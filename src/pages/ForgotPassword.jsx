@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertCircle, CheckCircle, Layout, ArrowLeft } from 'lucide-react';
-import API from '../services/api';
+import { ProjectService } from '../services/storage';
 
 // Two-step OTP-based password reset (Anna University portal style)
 // Step 1: Enter rollNo + email + mobile → verify identity → OTP sent to console
@@ -9,7 +9,6 @@ import API from '../services/api';
 
 const ForgotPassword = () => {
     // Step 1 state
-    const [rollNo, setRollNo] = useState('');
     const [email, setEmail] = useState('');
     const [mobile, setMobile] = useState('');
     const [step1Loading, setStep1Loading] = useState(false);
@@ -28,23 +27,20 @@ const ForgotPassword = () => {
         e.preventDefault();
         setStep1Error('');
 
-        if (!rollNo.trim() || !email.trim() || !mobile.trim()) {
-            setStep1Error('All three fields are required.');
+        if (!email.trim() || !mobile.trim()) {
+            setStep1Error('Both email and phone number are required.');
             return;
         }
 
         setStep1Loading(true);
-        try {
-            await API.post('/auth/send-otp', {
-                rollNo: rollNo.trim(),
-                email: email.trim(),
-                mobile: mobile.trim(),
-            });
+        const result = await ProjectService.forgotPassword(email.trim(), mobile.trim());
+        setStep1Loading(false);
+
+        if (result.success) {
+            alert(`TEST OTP: ${result.otp}`); // Testing only
             setStep(2);
-        } catch (err) {
-            setStep1Error(err.response?.data?.message || 'Verification failed. Please check your details.');
-        } finally {
-            setStep1Loading(false);
+        } else {
+            setStep1Error(result.error || 'Verification failed. Please check your details.');
         }
     };
 
@@ -57,17 +53,14 @@ const ForgotPassword = () => {
         if (newPassword !== confirmPassword) { setStep2Error('Passwords do not match.'); return; }
 
         setStep2Loading(true);
-        try {
-            await API.post('/auth/reset-password', {
-                rollNo: rollNo.trim(),
-                otp: otp.trim(),
-                newPassword,
-            });
+        // We will call verifyOtp to check, then resetPassword directly or just reset immediately
+        const result = await ProjectService.resetPassword(email.trim(), otp.trim(), newPassword);
+        setStep2Loading(false);
+
+        if (result.success) {
             setSuccess(true);
-        } catch (err) {
-            setStep2Error(err.response?.data?.message || 'Reset failed. The OTP may have expired.');
-        } finally {
-            setStep2Loading(false);
+        } else {
+            setStep2Error(result.error || 'Reset failed. The OTP may have expired.');
         }
     };
 
@@ -134,7 +127,7 @@ const ForgotPassword = () => {
                     ) : step === 1 ? (
                         <>
                             <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-                                Enter your registered Roll Number, Email, and Mobile Number to verify your identity.
+                                Enter your registered Email Address and Mobile Number to verify your identity.
                             </p>
                             {step1Error && (
                                 <div style={{
@@ -147,9 +140,8 @@ const ForgotPassword = () => {
                             )}
                             <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                 {[
-                                    { label: 'Roll Number', value: rollNo, set: setRollNo, placeholder: 'e.g. 21CSE001', type: 'text' },
-                                    { label: 'Registered Email', value: email, set: setEmail, placeholder: 'name@college.edu', type: 'email' },
-                                    { label: 'Mobile Number', value: mobile, set: setMobile, placeholder: '9XXXXXXXXX', type: 'tel' },
+                                    { label: 'Registered Email', value: email, set: setEmail, placeholder: 'name@gmail.com', type: 'email' },
+                                    { label: 'Mobile Number', value: mobile, set: setMobile, placeholder: '10-digit mobile number', type: 'tel' },
                                 ].map(({ label, value, set, placeholder, type }) => (
                                     <div key={label}>
                                         <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-main)' }}>

@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import projectRoutes from './routes/projects.js';
 import guideRequestRoutes from './routes/guideRequests.js';
+import templateRoutes from './routes/templates.js';
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/guide-requests', guideRequestRoutes);
+app.use('/api/templates', templateRoutes);
 
 // Base Route
 app.get('/', (req, res) => {

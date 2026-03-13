@@ -28,6 +28,33 @@ export const ProjectService = {
         }
     },
 
+    forgotPassword: async (email, phone) => {
+        try {
+            const { data } = await API.post('/auth/forgot-password', { email, phone });
+            return { success: true, ...data };
+        } catch (error) {
+            return { success: false, error: error.response?.data?.message || 'Failed to send OTP' };
+        }
+    },
+
+    verifyOtp: async (email, otp) => {
+        try {
+            const { data } = await API.post('/auth/verify-otp', { email, otp });
+            return { success: true, ...data };
+        } catch (error) {
+            return { success: false, error: error.response?.data?.message || 'Invalid or expired OTP' };
+        }
+    },
+
+    resetPassword: async (email, otp, newPassword) => {
+        try {
+            const { data } = await API.post('/auth/reset-password', { email, otp, newPassword });
+            return { success: true, ...data };
+        } catch (error) {
+            return { success: false, error: error.response?.data?.message || 'Failed to reset password' };
+        }
+    },
+
     addUser: async (user) => {
         try { const { data } = await API.post('/users', user); return { success: true, user: normalize(data) }; }
         catch (error) { return { success: false, error: error.response?.data?.message || 'Failed to create user' }; }
@@ -185,6 +212,34 @@ export const ProjectService = {
             return { success: true, data: normalize(data) };
         } catch (error) {
             return { success: false, error: error.response?.data?.message || 'Upload failed' };
+        }
+    },
+
+    // --- Templates Management ---
+    getTemplates: async () => {
+        try { const { data } = await API.get('/templates'); return data; }
+        catch (error) { return []; }
+    },
+
+    uploadTemplate: async (name, description, file) => {
+        try {
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('description', description);
+            formData.append('file', file);
+            const { data } = await API.post('/templates', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            return { success: true, data };
+        } catch (error) { 
+            return { success: false, error: error.response?.data?.message || 'Failed to upload template' }; 
+        }
+    },
+
+    deleteTemplate: async (id) => {
+        try {
+            await API.delete(`/templates/${id}`);
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.response?.data?.message || 'Failed to delete template' };
         }
     }
 };

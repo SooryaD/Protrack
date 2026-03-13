@@ -92,6 +92,7 @@ const StudentDashboard = () => {
     const [activeTab, setActiveTab] = useState('details');
     const [formError, setFormError] = useState('');
     const [myRequest, setMyRequest] = useState(null);
+    const [templates, setTemplates] = useState([]);
 
     useEffect(() => {
         if (user) {
@@ -102,18 +103,27 @@ const StudentDashboard = () => {
                 loadGuidesAndRequest();
             }
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user, view]);
 
     const loadGuidesAndRequest = async () => {
         const req = await ProjectService.getMyGuideRequest();
         if (req.success) setMyRequest(req.data);
-        const g = await ProjectService.getStaffUsers();
+        const [g, t] = await Promise.all([
+            ProjectService.getStaffUsers(),
+            ProjectService.getTemplates()
+        ]);
         setGuides(g);
+        setTemplates(t || []);
     };
 
     const loadProposals = async () => {
-        const data = await ProjectService.getStudentProposals(user.id);
+        const [data, tData] = await Promise.all([
+            ProjectService.getStudentProposals(user.id),
+            ProjectService.getTemplates()
+        ]);
         setProposals(data);
+        setTemplates(tData || []);
         if (selectedProject) {
             const fresh = data.find(p => p.id === selectedProject.id);
             if (fresh) setSelectedProject(fresh);
@@ -167,9 +177,8 @@ const StudentDashboard = () => {
         const response = await ProjectService.submitProposal(user.id, user.name, payload, abstractFile);
 
         if (response.success) {
-            loadProposals();
+            await loadProposals();
             if (!selectedProject) setView('list');
-            else setSelectedProject(response.data);
         } else {
             setFormError(response.error);
         }
@@ -192,15 +201,21 @@ const StudentDashboard = () => {
         if (uploadType === 'code' && !file.name.endsWith('.zip')) return alert('Upload a .zip file.');
         if (uploadType !== 'code' && !file.name.endsWith('.pdf')) return alert('Upload a .pdf file.');
         const response = await ProjectService.uploadFile(selectedProject.id, uploadType, file);
-        if (response.success) { setSelectedProject(response.data); setProposals(prev => prev.map(p => p.id === response.data.id ? response.data : p)); }
-        else alert('Upload Failed: ' + response.error);
+        if (response.success) { 
+            await loadProposals();
+        } else {
+            alert('Upload Failed: ' + response.error);
+        }
     };
 
     const handleSubmitForReview = async () => {
         if (!window.confirm('Submit final report? Files will be locked.')) return;
         const response = await ProjectService.updateStatus(selectedProject.id, 'PROJECT_SUBMITTED', 'Final project submitted for viva-voce.', user.name, user.role, user.id);
-        if (response.success) { setSelectedProject(response.data); setProposals(prev => prev.map(p => p.id === response.data.id ? response.data : p)); }
-        else alert('Submission Failed: ' + response.error);
+        if (response.success) { 
+            await loadProposals();
+        } else {
+            alert('Submission Failed: ' + response.error);
+        }
     };
 
     const WorkflowBar = ({ status }) => {
@@ -326,33 +341,45 @@ const StudentDashboard = () => {
                     )}
                 </div>
 
-                {/* MCA Schedule Download */}
-                <a
-                    href="/mca_schedule.pdf"
-                    download="MCA_Project_Schedule.pdf"
-                    style={{
-                        display: 'flex', alignItems: 'center', gap: '1rem',
-                        padding: '0.9rem 1.25rem', marginBottom: '1.5rem',
-                        background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.08) 100%)',
-                        border: '1px solid rgba(99,102,241,0.25)',
-                        borderRadius: 'var(--radius-md, 10px)',
-                        textDecoration: 'none', cursor: 'pointer',
-                        transition: 'box-shadow 0.2s, border-color 0.2s',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(99,102,241,0.18)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.25)'; }}
-                >
-                    <div style={{ background: 'rgba(99,102,241,0.12)', padding: '0.6rem', borderRadius: '8px', display: 'flex', flexShrink: 0 }}>
-                        <CalendarDays size={20} color="var(--primary)" />
+                {/* Dynamic Templates Section */}
+                {templates && templates.length > 0 && (
+                    <div style={{ marginBottom: '2.5rem' }}>
+                        <h3 style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <FileText size={18} color="var(--primary)" /> Project Templates
+                        </h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+                            {templates.map(t => (
+                                <a
+                                    key={t.id}
+                                    href={`http://localhost:5000/${t.file_path}`}
+                                    target="_blank" rel="noopener noreferrer"
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '0.875rem',
+                                        padding: '1rem 1.25rem',
+                                        background: 'linear-gradient(135deg, rgba(99,102,241,0.05) 0%, rgba(139,92,246,0.05) 100%)',
+                                        border: '1px solid rgba(99,102,241,0.2)',
+                                        borderRadius: 'var(--radius-md)',
+                                        textDecoration: 'none', cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(99,102,241,0.12)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.4)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
+                                    onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.2)'; e.currentTarget.style.transform = 'none' }}
+                                >
+                                    <div style={{ background: 'rgba(99,102,241,0.1)', padding: '0.6rem', borderRadius: '8px', display: 'flex', flexShrink: 0 }}>
+                                        <FileText size={18} color="var(--primary)" />
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</div>
+                                        {t.description && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.description}</div>}
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', background: 'white', borderRadius: '50%', flexShrink: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                                        <Download size={14} color="var(--primary)" />
+                                    </div>
+                                </a>
+                            ))}
+                        </div>
                     </div>
-                    <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)' }}>MCA Project Schedule</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>Download the official MCA project schedule &amp; timeline (PDF)</div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--primary)', flexShrink: 0 }}>
-                        <Download size={15} /> Download PDF
-                    </div>
-                </a>
+                )}
 
                 {proposals.length === 0 ? (
                     <div className="saas-card" style={{ textAlign: 'center', padding: '4rem 2rem', borderStyle: 'dashed' }}>

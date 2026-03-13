@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ProjectService } from '../services/storage';
 import { useAuth } from '../context/AuthContext';
-import { Users, BarChart2, Trash2, Plus, Briefcase, Activity, Clock, CheckCircle, XCircle, Shield, Star, LayoutDashboard, RefreshCw, Code, FileText } from 'lucide-react';
+import { Users, BarChart2, Trash2, Plus, Briefcase, Activity, Clock, CheckCircle, XCircle, Shield, Star, LayoutDashboard, RefreshCw, Code, FileText, Download, FileAudio, File } from 'lucide-react';
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'student', assignedGuideId: '', assignedGuideName: '' };
 
@@ -19,17 +19,23 @@ const AdminDashboard = () => {
     const [cscComments, setCscComments] = useState({});
     const [capacities, setCapacities] = useState({});
 
+    const [templates, setTemplates] = useState([]);
+    const [newTemplate, setNewTemplate] = useState({ name: '', description: '', file: null });
+    const [templateMsg, setTemplateMsg] = useState(null);
+
     useEffect(() => { loadData(); }, [activeTab]);
 
     const loadData = async () => {
-        const [statsData, usersData, projectsData] = await Promise.all([
+        const [statsData, usersData, projectsData, templatesData] = await Promise.all([
             ProjectService.getStats(),
             ProjectService.getAllUsers(),
             ProjectService.getAllProposals(),
+            ProjectService.getTemplates()
         ]);
         setStats(statsData);
         setUsers(usersData);
         setProjects(projectsData);
+        setTemplates(templatesData || []);
         const staff = usersData.filter(u => u.role === 'staff' && u.isActive !== false);
         setStaffList(staff);
 
@@ -110,6 +116,33 @@ const AdminDashboard = () => {
         const res = await ProjectService.updateStatus(projectId, 'PROJECT_COMPLETED', 'Final approval granted by Admin.', user.name, user.role, user.id);
         if (res.success) loadData();
         else alert('Approval Failed: ' + res.error);
+    };
+
+    const handleUploadTemplate = async (e) => {
+        e.preventDefault();
+        if (!newTemplate.name || !newTemplate.file) {
+            setTemplateMsg({ type: 'error', text: 'Name and file are required.' });
+            return;
+        }
+        setSubmitting(true);
+        const res = await ProjectService.uploadTemplate(newTemplate.name, newTemplate.description, newTemplate.file);
+        setSubmitting(false);
+        if (res.success) {
+            setTemplateMsg({ type: 'success', text: 'Template uploaded successfully!' });
+            setNewTemplate({ name: '', description: '', file: null });
+            const fileInput = document.getElementById('templateFileInput');
+            if (fileInput) fileInput.value = '';
+            loadData();
+        } else {
+            setTemplateMsg({ type: 'error', text: res.error });
+        }
+    };
+
+    const handleDeleteTemplate = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this template?')) return;
+        const res = await ProjectService.deleteTemplate(id);
+        if (res.success) loadData();
+        else alert('Failed to delete template: ' + res.error);
     };
 
     const getStatusBadge = (status) => {
@@ -210,6 +243,7 @@ const AdminDashboard = () => {
                     {tabBtn('csc', 'CSC Review', Shield)}
                     {tabBtn('users', 'Users', Users)}
                     {tabBtn('projects', 'Projects', Briefcase)}
+                    {tabBtn('templates', 'Templates', File)}
                 </div>
             </div>
 
@@ -447,6 +481,103 @@ const AdminDashboard = () => {
                             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)' }}>
                                 <Briefcase size={32} style={{ margin: '0 auto 1rem', opacity: 0.5, display: 'block' }} />
                                 <p>No projects found in the system yet.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* TEMPLATES TAB */}
+            {activeTab === 'templates' && (
+                <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 2fr', gap: '2rem' }}>
+                    
+                    {/* Upload Form */}
+                    <div className="saas-card" style={{ padding: '1.75rem', height: 'fit-content' }}>
+                        <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem', fontWeight: 600 }}>
+                            <FileText size={18} color="var(--primary)" /> Upload Template
+                        </h3>
+
+                        {templateMsg && (
+                            <div style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', fontSize: '0.875rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem', background: templateMsg.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${templateMsg.type === 'success' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.2)'}`, color: templateMsg.type === 'success' ? '#15803d' : '#ef4444' }}>
+                                {templateMsg.type === 'success' ? <CheckCircle size={15} style={{ marginTop: '1px', flexShrink: 0 }} /> : <XCircle size={15} style={{ marginTop: '1px', flexShrink: 0 }} />}
+                                {templateMsg.text}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleUploadTemplate} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>Template Name *</label>
+                                <input
+                                    className="saas-input" type="text" placeholder="e.g. Review 1 Format" required
+                                    value={newTemplate.name} onChange={e => setNewTemplate({ ...newTemplate, name: e.target.value })}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>Description</label>
+                                <textarea
+                                    className="saas-input" placeholder="Brief instructions..." rows={2} style={{ resize: 'none' }}
+                                    value={newTemplate.description} onChange={e => setNewTemplate({ ...newTemplate, description: e.target.value })}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>File Document *</label>
+                                <input
+                                    id="templateFileInput"
+                                    type="file" required
+                                    style={{ fontSize: '0.85rem', padding: '0.5rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-sm)', width: '100%', boxSizing: 'border-box' }}
+                                    onChange={e => setNewTemplate({ ...newTemplate, file: e.target.files[0] })}
+                                />
+                            </div>
+                            <button type="submit" className="btn-primary" disabled={submitting} style={{ padding: '0.7rem', marginTop: '0.5rem' }}>
+                                {submitting ? 'Uploading...' : 'Upload Required Template'}
+                            </button>
+                        </form>
+                    </div>
+
+                    {/* Template List */}
+                    <div className="saas-card" style={{ padding: '1.75rem' }}>
+                        <h3 style={{ fontSize: '1.1rem', marginBottom: '1.5rem', fontWeight: 600 }}>Available Templates <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 400, marginLeft: '0.5rem' }}>({templates.length})</span></h3>
+                        
+                        {templates.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '3rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                                <FileText size={32} color="var(--text-muted)" style={{ margin: '0 auto 1rem', display: 'block', opacity: 0.4 }} />
+                                <h4 style={{ fontSize: '1rem', color: 'var(--text-main)', marginBottom: '0.5rem' }}>No Templates Found</h4>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Upload templates to make them available for students.</p>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                {templates.map(t => (
+                                    <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem', background: '#F8FAFC', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', transition: 'var(--transition)' }} className="hover-scale">
+                                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+                                            <div style={{ padding: '0.75rem', background: 'white', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <FileText size={20} color="var(--primary)" />
+                                            </div>
+                                            <div>
+                                                <h4 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.2rem' }}>{t.name}</h4>
+                                                {t.description && <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>{t.description}</p>}
+                                                <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                                    <Clock size={12} /> Added: {new Date(t.created_at).toLocaleDateString()}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <a 
+                                                href={`http://localhost:5000/${t.file_path}`} 
+                                                target="_blank" rel="noopener noreferrer" 
+                                                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 500, background: '#EFF6FF', color: 'var(--primary)', textDecoration: 'none', borderRadius: 'var(--radius-sm)', transition: 'var(--transition)' }}
+                                            >
+                                                <Download size={14} /> View
+                                            </a>
+                                            <button 
+                                                onClick={() => handleDeleteTemplate(t.id)} 
+                                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.4rem 0.5rem', background: '#FEE2E2', color: '#DC2626', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', transition: 'var(--transition)' }}
+                                            >
+                                                <Trash2 size={15} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
