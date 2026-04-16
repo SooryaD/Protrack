@@ -1,5 +1,4 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import axios from 'axios';
 import API from '../services/api';
 
 const AuthContext = createContext(null);
@@ -8,10 +7,10 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // On mount, attempt to restore session from sessionStorage token
+    // On mount, attempt to restore session from localStorage token
     useEffect(() => {
         const restoreSession = async () => {
-            const storedUser = sessionStorage.getItem('user');
+            const storedUser = localStorage.getItem('user');
             if (!storedUser) {
                 setLoading(false);
                 return;
@@ -21,32 +20,32 @@ export const AuthProvider = ({ children }) => {
             try {
                 stored = JSON.parse(storedUser);
             } catch {
-                sessionStorage.removeItem('user');
+                localStorage.removeItem('user');
                 setLoading(false);
                 return;
             }
 
             if (!stored?.token) {
-                sessionStorage.removeItem('user');
+                localStorage.removeItem('user');
                 setLoading(false);
                 return;
             }
 
             try {
-                // Use a direct axios call (bypasses our 401 interceptor) so a
-                // bad/expired token doesn't trigger a hard redirect during restore.
-                const { data } = await axios.get('http://localhost:5000/api/auth/me', {
+                // Use the configured API instance (reads VITE_API_URL, not hardcoded localhost)
+                // Set the Authorization header manually here to avoid circular dependency
+                const { data } = await API.get('/auth/me', {
                     headers: { Authorization: `Bearer ${stored.token}` },
                 });
 
                 // Normalise id field and merge token back in
                 const restoredUser = { ...data, id: data.id || data._id, token: stored.token };
                 setUser(restoredUser);
-                // Keep sessionStorage in sync with fresh server data
-                sessionStorage.setItem('user', JSON.stringify(restoredUser));
+                // Keep localStorage in sync with fresh server data
+                localStorage.setItem('user', JSON.stringify(restoredUser));
             } catch {
                 // Token invalid or expired — clear session silently
-                sessionStorage.removeItem('user');
+                localStorage.removeItem('user');
                 setUser(null);
             } finally {
                 setLoading(false);
@@ -57,12 +56,11 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const login = async (credentials, password) => {
-        // credentials = { rollNo } for students, { email } for staff/admin
         try {
             const { data } = await API.post('/auth/login', { ...credentials, password });
             const userData = { ...data, id: data._id || data.id };
             setUser(userData);
-            sessionStorage.setItem('user', JSON.stringify(userData));
+            localStorage.setItem('user', JSON.stringify(userData));
             return { success: true, user: userData };
         } catch (error) {
             return {
@@ -74,7 +72,7 @@ export const AuthProvider = ({ children }) => {
 
     const logout = () => {
         setUser(null);
-        sessionStorage.removeItem('user');
+        localStorage.removeItem('user');
     };
 
     return (

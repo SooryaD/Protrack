@@ -4,13 +4,17 @@ const API = axios.create({
     baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
 });
 
-// Request interceptor — attach Bearer token from sessionStorage
+// Request interceptor — attach Bearer token from localStorage
 API.interceptors.request.use((req) => {
-    const user = sessionStorage.getItem('user');
+    const user = localStorage.getItem('user');
     if (user) {
-        const { token } = JSON.parse(user);
-        if (token) {
-            req.headers.Authorization = `Bearer ${token}`;
+        try {
+            const { token } = JSON.parse(user);
+            if (token) {
+                req.headers.Authorization = `Bearer ${token}`;
+            }
+        } catch {
+            // Corrupted data in localStorage — ignore
         }
     }
     return req;
@@ -24,7 +28,7 @@ API.interceptors.response.use(
             const msg = error.response?.data?.message?.toLowerCase() || '';
             const isTokenError = msg.includes('token') || msg.includes('not authorized') || msg.includes('no token');
             if (isTokenError) {
-                sessionStorage.removeItem('user');
+                localStorage.removeItem('user');
                 if (window.location.pathname !== '/') {
                     window.location.href = '/';
                 }
@@ -33,6 +37,5 @@ API.interceptors.response.use(
         return Promise.reject(error);
     }
 );
-
 
 export default API;
