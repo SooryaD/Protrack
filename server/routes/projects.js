@@ -2,15 +2,12 @@ import express from 'express';
 import { pool } from '../db.js';
 import multer from 'multer';
 import { protect } from '../middleware/auth.js';
+import { uploadToCloudinary } from '../cloudinary.js';
 
 const router = express.Router();
 router.use(protect);
 
-// Multer Config
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'uploads/'),
-    filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
-});
+// Multer — use memoryStorage so files are buffered then streamed to Cloudinary
 const ALLOWED_MIME_TYPES = [
     'application/pdf',
     'application/zip',
@@ -19,7 +16,7 @@ const ALLOWED_MIME_TYPES = [
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ];
 const upload = multer({
-    storage,
+    storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
     fileFilter: (req, file, cb) => {
         if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
@@ -137,6 +134,8 @@ router.post('/:id/upload', upload.single('file'), async (req, res) => {
         const { type } = req.body;
         const projectId = req.params.id;
 
+        if (!req.file) return res.status(400).json({ message: 'No file provided.' });
+
         const [pRows] = await pool.query('SELECT status FROM projects WHERE id = ?', [projectId]);
         if (pRows.length === 0) return res.status(404).json({ message: 'Project not found' });
         const pStatus = pRows[0].status;
@@ -144,11 +143,14 @@ router.post('/:id/upload', upload.single('file'), async (req, res) => {
         if (pStatus === 'PROJECT_SUBMITTED') return res.status(400).json({ message: 'Project already submitted. Files cannot be modified.' });
         if (!UPLOAD_ALLOWED_STATUSES.includes(pStatus)) return res.status(400).json({ message: `Files can only be uploaded at appropriate stages. Current status: ${pStatus}` });
 
-        const filePath = `uploads/${req.file.filename}`;
+        // Upload buffer to Cloudinary
+        const { url } = await uploadToCloudinary(req.file.buffer, {
+            folder: `protrack/projects/${projectId}`,
+            resource_type: 'auto',
+            public_id: `${type}_${Date.now()}`,
+        });
 
-        // Find existing project_files entry
-        const [fRows] = await pool.query('SELECT id FROM project_files WHERE project_id = ?', [projectId]);
-
+        // Map type to DB column
         let colToUpdate = '';
         if (type === 'code') colToUpdate = 'code_file';
         else if (type === 'report') colToUpdate = 'final_report_file';
@@ -156,15 +158,17 @@ router.post('/:id/upload', upload.single('file'), async (req, res) => {
         else if (type === 'firstReview') colToUpdate = 'first_review_file';
         else if (type === 'secondReview') colToUpdate = 'second_review_file';
 
+        if (!colToUpdate) return res.status(400).json({ message: 'Invalid file type specified.' });
+
+        // Save Cloudinary URL to DB
+        const [fRows] = await pool.query('SELECT id FROM project_files WHERE project_id = ?', [projectId]);
         if (fRows.length > 0) {
-            await pool.query(`UPDATE project_files SET ${colToUpdate} = ? WHERE project_id = ?`, [filePath, projectId]);
+            await pool.query(`UPDATE project_files SET ${colToUpdate} = ? WHERE project_id = ?`, [url, projectId]);
         } else {
-            await pool.query(`INSERT INTO project_files (project_id, ${colToUpdate}) VALUES (?, ?)`, [projectId, filePath]);
+            await pool.query(`INSERT INTO project_files (project_id, ${colToUpdate}) VALUES (?, ?)`, [projectId, url]);
         }
 
-        // We should return the modified project, but to simplify we can just return a basic object or re-fetch.
-        // The original code `res.json(updatedProject);` returns full project.
-        res.json({ message: 'Upload successful', _id: projectId, id: projectId });
+        res.json({ message: 'Upload successful', fileUrl: url, _id: projectId, id: projectId });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -269,12 +273,16 @@ router.post('/', upload.single('abstractFile'), async (req, res) => {
             }
 
             if (req.file) {
-                const filePath = `uploads/${req.file.filename}`;
+                const { url: abstractUrl } = await uploadToCloudinary(req.file.buffer, {
+                    folder: `protrack/projects/${projectId}`,
+                    resource_type: 'auto',
+                    public_id: `abstract_${Date.now()}`,
+                });
                 const [fRows] = await connection.query('SELECT id FROM project_files WHERE project_id = ?', [projectId]);
                 if (fRows.length > 0) {
-                    await connection.query('UPDATE project_files SET abstract_file = ? WHERE project_id = ?', [filePath, projectId]);
+                    await connection.query('UPDATE project_files SET abstract_file = ? WHERE project_id = ?', [abstractUrl, projectId]);
                 } else {
-                    await connection.query('INSERT INTO project_files (project_id, abstract_file) VALUES (?, ?)', [projectId, filePath]);
+                    await connection.query('INSERT INTO project_files (project_id, abstract_file) VALUES (?, ?)', [projectId, abstractUrl]);
                 }
             }
 
@@ -313,8 +321,12 @@ router.post('/', upload.single('abstractFile'), async (req, res) => {
             }
 
             if (req.file) {
-                const filePath = `uploads/${req.file.filename}`;
-                await connection.query('INSERT INTO project_files (project_id, abstract_file) VALUES (?, ?)', [projectId, filePath]);
+                const { url: abstractUrl } = await uploadToCloudinary(req.file.buffer, {
+                    folder: `protrack/projects/${projectId}`,
+                    resource_type: 'auto',
+                    public_id: `abstract_${Date.now()}`,
+                });
+                await connection.query('INSERT INTO project_files (project_id, abstract_file) VALUES (?, ?)', [projectId, abstractUrl]);
             }
 
             await connection.query(

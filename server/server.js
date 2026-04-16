@@ -49,9 +49,6 @@ app.use(cors({
 // Body parser
 app.use(express.json());
 
-// Static uploads
-app.use('/uploads', express.static('uploads'));
-
 // Rate limiting — auth routes (20 requests per 15 min per IP)
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
