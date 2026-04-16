@@ -28,9 +28,23 @@ const app = express();
 // Security headers
 app.use(helmet());
 
-// CORS — restrict to your frontend domain
-const allowedOrigin = process.env.CLIENT_URL || 'http://localhost:5173';
-app.use(cors({ origin: allowedOrigin, credentials: true }));
+// Trust proxy (required on Render for rate-limit + IP detection)
+app.set('trust proxy', 1);
+
+// CORS — allow Vercel frontend + localhost dev
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
+    .split(',')
+    .map(o => o.trim());
+
+app.use(cors({
+    origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, Postman, server-to-server)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+    },
+    credentials: true
+}));
 
 // Body parser
 app.use(express.json());
