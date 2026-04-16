@@ -9,6 +9,7 @@ import StaffDashboard from './pages/StaffDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import ForgotPassword from './pages/ForgotPassword';
 import Signup from './pages/Signup';
+import ResetPassword from './pages/ResetPassword';
 
 // Full-screen loading spinner shown while session is being validated
 const LoadingScreen = () => (
@@ -35,7 +36,7 @@ const ProtectedRoute = ({ children, allowedRole }) => {
 };
 
 // Public pages (no sidebar/navbar)
-const PUBLIC_PATHS = ['/', '/forgot-password', '/signup'];
+const PUBLIC_PATHS = ['/', '/forgot-password', '/signup', '/reset-password'];
 
 const AppContent = () => {
   const location = useLocation();
@@ -52,6 +53,7 @@ const AppContent = () => {
         <Route path="/" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     );
   }

@@ -6,8 +6,10 @@ import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
 
-const generateToken = (id, role) =>
-    jwt.sign({ id, role }, process.env.JWT_SECRET || 'secret123', { expiresIn: '7d' });
+const generateToken = (id, role) => {
+    if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set!');
+    return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+};
 
 // @route   POST /api/auth/login
 // @access  Public
@@ -109,7 +111,7 @@ router.post('/register', async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
         const finalName = name?.trim() || entry.name;
-        
+
         // Fetch guide info if user had user_id assigned in registry? 
         // Wait, the JSON registry was assigning an empty assignedGuideName
         const [insertResult] = await connection.query(
@@ -156,7 +158,7 @@ router.post('/verify-student', async (req, res) => {
 
         if (!entry) return res.status(400).json({ message: 'Roll number not found.' });
         if (entry.registered) return res.status(400).json({ message: 'Account already exists for this roll number.' });
-        
+
         // Fetch assigned guide name if exist (wait, registry doesn't have assigned guide in schema)
         res.json({ valid: true, name: entry.name, assignedGuideName: null });
     } catch (err) {
@@ -182,7 +184,7 @@ router.post('/forgot-password', async (req, res) => {
     try {
         const [userRows] = await pool.query('SELECT * FROM users WHERE email = ?', [email.trim().toLowerCase()]);
         const user = userRows[0];
-        
+
         if (!user) {
             return res.status(400).json({ message: 'If the details exist, an OTP has been generated.' }); // Prevent email enumeration
         }
@@ -212,7 +214,7 @@ router.post('/forgot-password', async (req, res) => {
         console.log(`OTP: ${otp}`);
         console.log(`===========================================\n`);
 
-        res.json({ message: 'OTP generated successfully.', otp }); // For testing, returning OTP. Remove in prod!
+        res.json({ message: 'OTP generated. Please check your registered phone number.' });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

@@ -33,3 +33,16 @@ Thumbs.db
 # Temp / comparison files
 workflow_comparison.html
 workflow_comparison.pdf
+workflow_presentation.html
+
+# Dev / test scripts and artifacts (not needed in production)
+build_output.txt
+eslint_out.json
+lint-results.json
+out.txt
+test2.js
+test_workflow.js
+e2e_test.js
+generate_ppt.js
+dummy_*.pdf
+dummy_*.zip

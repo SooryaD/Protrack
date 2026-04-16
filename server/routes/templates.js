@@ -12,14 +12,30 @@ const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const dir = 'uploads/templates/';
         // Ensure directory exists
-        if (!fs.existsSync(dir)){
+        if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
         }
         cb(null, dir);
     },
     filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
 });
-const upload = multer({ storage });
+const ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'application/zip',
+    'application/x-zip-compressed',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
+const upload = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    fileFilter: (req, file, cb) => {
+        if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only PDF, ZIP, and DOCX files are allowed.'));
+        }
+    }
+});
 
 // @route   GET /api/templates
 // @desc    Get all templates
@@ -39,23 +55,23 @@ router.get('/', protect, async (req, res) => {
 router.post('/', protect, adminOnly, upload.single('file'), async (req, res) => {
     try {
         const { name, description } = req.body;
-        
+
         if (!name || !req.file) {
             return res.status(400).json({ message: 'Template name and file are required.' });
         }
 
         const filePath = `uploads/templates/${req.file.filename}`;
-        
+
         const [result] = await pool.query(
             'INSERT INTO templates (name, description, file_path) VALUES (?, ?, ?)',
             [name, description || '', filePath]
         );
 
-        res.status(201).json({ 
-            id: result.insertId, 
-            name, 
-            description, 
-            file_path: filePath 
+        res.status(201).json({
+            id: result.insertId,
+            name,
+            description,
+            file_path: filePath
         });
     } catch (error) {
         res.status(500).json({ message: error.message });

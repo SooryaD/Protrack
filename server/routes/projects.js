@@ -11,7 +11,24 @@ const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'uploads/'),
     filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
 });
-const upload = multer({ storage });
+const ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'application/zip',
+    'application/x-zip-compressed',
+    'application/octet-stream',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
+const upload = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    fileFilter: (req, file, cb) => {
+        if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only PDF, ZIP, and DOCX files are allowed.'));
+        }
+    }
+});
 
 const UPLOAD_ALLOWED_STATUSES = ['TITLE_PENDING', 'TITLE_APPROVED', 'CHANGES_REQUESTED', 'RESUBMITTED', 'FIRST_REVIEW_PENDING', 'FIRST_REVIEW_DONE', 'SECOND_REVIEW_DONE', 'REPORT_CHANGES_REQUESTED'];
 
@@ -119,7 +136,7 @@ router.post('/:id/upload', upload.single('file'), async (req, res) => {
     try {
         const { type } = req.body;
         const projectId = req.params.id;
-        
+
         const [pRows] = await pool.query('SELECT status FROM projects WHERE id = ?', [projectId]);
         if (pRows.length === 0) return res.status(404).json({ message: 'Project not found' });
         const pStatus = pRows[0].status;
@@ -128,10 +145,10 @@ router.post('/:id/upload', upload.single('file'), async (req, res) => {
         if (!UPLOAD_ALLOWED_STATUSES.includes(pStatus)) return res.status(400).json({ message: `Files can only be uploaded at appropriate stages. Current status: ${pStatus}` });
 
         const filePath = `uploads/${req.file.filename}`;
-        
+
         // Find existing project_files entry
         const [fRows] = await pool.query('SELECT id FROM project_files WHERE project_id = ?', [projectId]);
-        
+
         let colToUpdate = '';
         if (type === 'code') colToUpdate = 'code_file';
         else if (type === 'report') colToUpdate = 'final_report_file';
@@ -176,7 +193,7 @@ router.get('/', async (req, res) => {
         const vivaMap = {}; vRows.forEach(r => vivaMap[r.project_id] = r);
 
         const [hRows] = await pool.query('SELECT * FROM project_history ORDER BY created_at ASC');
-        const historyMap = {}; 
+        const historyMap = {};
         hRows.forEach(r => {
             if (!historyMap[r.project_id]) historyMap[r.project_id] = [];
             historyMap[r.project_id].push(r);
@@ -234,7 +251,7 @@ router.post('/', upload.single('abstractFile'), async (req, res) => {
             // Note: If columns abstract etc are missing, MySQL throws error here. 
             // We'll write to them assuming they were added. If missing, we skip abstract from standard fields.
             // But let's assume they must exist or will fail gracefully if strictly adhering to user instructions.
-            
+
             const uTitle = title || p.title;
             const uDomain = domain || p.domain;
             const uTs = techStack || p.tech_stack;
@@ -243,12 +260,12 @@ router.post('/', upload.single('abstractFile'), async (req, res) => {
             // Optional fields check
             let updateQuery = 'UPDATE projects SET title=?, domain=?, tech_stack=?, status=?, guide_id=?';
             let updateParams = [uTitle, uDomain, uTs, newStatus, uGuide];
-            
+
             // To be robust against schema mismatches, we can catch specific errors, but simpler to just try
             try {
                 await connection.query(`${updateQuery}, abstract=? WHERE id=?`, [...updateParams, abstract || p.abstract || '', projectId]);
             } catch (err) {
-                 await connection.query(`${updateQuery} WHERE id=?`, [...updateParams, projectId]);
+                await connection.query(`${updateQuery} WHERE id=?`, [...updateParams, projectId]);
             }
 
             if (req.file) {
@@ -267,7 +284,7 @@ router.post('/', upload.single('abstractFile'), async (req, res) => {
             );
 
             await connection.commit();
-            
+
             // Simple response since refetch is complex
             res.json({ _id: projectId, id: projectId, status: newStatus });
 
@@ -326,7 +343,7 @@ router.put('/:id/status', async (req, res) => {
 
         if (actorRole === 'admin' && status !== 'PROJECT_COMPLETED') return res.status(403).json({ message: 'Admins use the CSC review endpoint.' });
         if (status === 'PROJECT_COMPLETED' && project.status !== 'PENDING_ADMIN_APPROVAL') return res.status(400).json({ message: 'Project can only be completed by Admin after PENDING_ADMIN_APPROVAL.' });
-        
+
         if (status === 'PROJECT_SUBMITTED' && actorRole === 'student' && project.student_id == actorId) {
             // OK
         } else if (actorRole !== 'admin' && project.guide_id != actorId) {
@@ -403,7 +420,7 @@ router.put('/:id/first-review', async (req, res) => {
             problem_definition=VALUES(problem_definition), literature_review=VALUES(literature_review), novelty=VALUES(novelty), 
             design=VALUES(design), methodology=VALUES(methodology), guide_marks=VALUES(guide_marks), total_marks=VALUES(total_marks)
         `, [
-            req.params.id, 
+            req.params.id,
             marks.problemDefinition || 0, marks.literatureReview || 0, marks.novelIdea || 0,
             marks.detailedDesign || 0, marks.methodology || 0, marks.guideMarks || 0, total
         ]);
@@ -445,7 +462,7 @@ router.put('/:id/second-review', async (req, res) => {
             system_design=VALUES(system_design), modules_completed=VALUES(modules_completed), dataset=VALUES(dataset), 
             pseudocode=VALUES(pseudocode), contribution=VALUES(contribution), guide_marks=VALUES(guide_marks), total_marks=VALUES(total_marks)
         `, [
-            req.params.id, 
+            req.params.id,
             marks.systemDesign || 0, marks.modulesCompleted || 0, marks.dataSet || 0,
             marks.pseudoCode || 0, marks.contribution || 0, marks.guideMarks || 0, total
         ]);
