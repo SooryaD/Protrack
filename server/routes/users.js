@@ -15,7 +15,8 @@ router.get('/staff', protect, async (req, res) => {
             name: u.name,
             email: u.email,
             role: u.role,
-            maxStudents: u.max_students ?? 2,
+            designation: u.designation || '',
+            maxStudents: u.max_students ?? 5,
             currentStudentCount: u.current_student_count ?? 0
         }));
         res.json(staffUsers);
@@ -41,10 +42,11 @@ router.get('/', protect, adminOnly, async (req, res) => {
         const usersMapped = rows.map(u => ({
             _id: u.id, id: u.id,
             name: u.name, email: u.email, role: u.role,
-            isActive: true, // Assuming true
+            designation: u.designation || '',
+            isActive: true,
             assignedGuideId: u.assigned_guide_id || null,
             assignedGuideName: u.assigned_guide_id ? (guideMap[u.assigned_guide_id] || '') : null,
-            maxStudents: u.max_students ?? 2,
+            maxStudents: u.max_students ?? 5,
             currentStudentCount: u.current_student_count ?? 0,
             createdAt: u.created_at,
         }));

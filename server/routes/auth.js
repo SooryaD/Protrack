@@ -72,13 +72,13 @@ router.post('/login', async (req, res) => {
 });
 
 // @route   POST /api/auth/register
-// @desc    Student self-registration — verify Roll No + Phone, then create account
+// @desc    Student self-registration — verify Roll No exists in registry, then create account
 // @access  Public
 router.post('/register', async (req, res) => {
-    const { rollNo, phone, email, password, name } = req.body;
+    const { rollNo, email, password, name } = req.body;
 
-    if (!rollNo || !phone || !email || !password) {
-        return res.status(400).json({ message: 'Roll number, phone, email and password are required.' });
+    if (!rollNo || !email || !password) {
+        return res.status(400).json({ message: 'Roll number, email and password are required.' });
     }
 
     const connection = await pool.getConnection();
@@ -86,7 +86,7 @@ router.post('/register', async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        // 1. Find the student in the registry
+        // 1. Find the student in the registry (only roll number check — no phone required)
         const [registryRows] = await connection.query('SELECT * FROM student_registry WHERE roll_no = ?', [rollNo.trim().toUpperCase()]);
         const entry = registryRows[0];
 
@@ -112,16 +112,14 @@ router.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
         const finalName = name?.trim() || entry.name;
 
-        // Fetch guide info if user had user_id assigned in registry? 
-        // Wait, the JSON registry was assigning an empty assignedGuideName
         const [insertResult] = await connection.query(
             'INSERT INTO users (name, email, password, role, roll_no, assigned_guide_id) VALUES (?, ?, ?, ?, ?, ?)',
             [finalName, email.trim().toLowerCase(), hashedPassword, 'student', entry.roll_no, null]
         );
         const newUserId = insertResult.insertId;
 
-        // 4. Mark registry entry as registered and update phone number to the one provided
-        await connection.query('UPDATE student_registry SET registered = TRUE, user_id = ?, phone = ? WHERE id = ?', [newUserId, phone.trim(), entry.id]);
+        // 4. Mark registry entry as registered
+        await connection.query('UPDATE student_registry SET registered = TRUE, user_id = ? WHERE id = ?', [newUserId, entry.id]);
 
         await connection.commit();
 
@@ -145,21 +143,20 @@ router.post('/register', async (req, res) => {
 });
 
 // @route   POST /api/auth/verify-student
-// @desc    Check if a roll no + phone is valid and not yet registered
+// @desc    Check if a roll no is valid and not yet registered (no phone required)
 // @access  Public
 router.post('/verify-student', async (req, res) => {
-    const { rollNo, phone } = req.body;
-    if (!rollNo || !phone) {
-        return res.status(400).json({ message: 'Roll number and phone are required.' });
+    const { rollNo } = req.body;
+    if (!rollNo) {
+        return res.status(400).json({ message: 'Roll number is required.' });
     }
     try {
         const [rows] = await pool.query('SELECT * FROM student_registry WHERE roll_no = ?', [rollNo.trim().toUpperCase()]);
         const entry = rows[0];
 
-        if (!entry) return res.status(400).json({ message: 'Roll number not found.' });
+        if (!entry) return res.status(400).json({ message: 'Roll number not found. Please contact the administrator.' });
         if (entry.registered) return res.status(400).json({ message: 'Account already exists for this roll number.' });
 
-        // Fetch assigned guide name if exist (wait, registry doesn't have assigned guide in schema)
         res.json({ valid: true, name: entry.name, assignedGuideName: null });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -173,12 +170,12 @@ router.get('/me', protect, (req, res) => {
 });
 
 // @route   POST /api/auth/forgot-password
-// @desc    Generate OTP for forgot password
+// @desc    Generate OTP for forgot password (email only — no phone required)
 // @access  Public
 router.post('/forgot-password', async (req, res) => {
-    const { email, phone } = req.body;
-    if (!email || !phone) {
-        return res.status(400).json({ message: 'Email and phone number are required.' });
+    const { email } = req.body;
+    if (!email) {
+        return res.status(400).json({ message: 'Email is required.' });
     }
 
     try {
@@ -189,14 +186,7 @@ router.post('/forgot-password', async (req, res) => {
             return res.status(400).json({ message: 'If the details exist, an OTP has been generated.' }); // Prevent email enumeration
         }
 
-        if (user.role === 'student' && user.roll_no) {
-            const [regRows] = await pool.query('SELECT phone FROM student_registry WHERE roll_no = ?', [user.roll_no]);
-            if (regRows.length === 0 || regRows[0].phone !== phone.trim()) {
-                return res.status(400).json({ message: 'If the details exist, an OTP has been generated.' }); // Generic error
-            }
-        } else if (user.role !== 'student') {
-            // Strictly speaking, staff lack phones in our db schema. You may allow or block them.
-            // For now, let's block or just accept since they don't have phone validation
+        if (user.role !== 'student') {
             return res.status(400).json({ message: 'Staff password resets must be done by Admin.' });
         }
 
@@ -214,7 +204,7 @@ router.post('/forgot-password', async (req, res) => {
         console.log(`OTP: ${otp}`);
         console.log(`===========================================\n`);
 
-        res.json({ message: 'OTP generated. Please check your registered phone number.' });
+        res.json({ message: 'OTP generated. Please check your email inbox.' });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

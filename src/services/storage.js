@@ -28,9 +28,9 @@ export const ProjectService = {
         }
     },
 
-    forgotPassword: async (email, phone) => {
+    forgotPassword: async (email) => {
         try {
-            const { data } = await API.post('/auth/forgot-password', { email, phone });
+            const { data } = await API.post('/auth/forgot-password', { email });
             return { success: true, ...data };
         } catch (error) {
             return { success: false, error: error.response?.data?.message || 'Failed to send OTP' };
@@ -60,10 +60,10 @@ export const ProjectService = {
         catch (error) { return { success: false, error: error.response?.data?.message || 'Failed to create user' }; }
     },
 
-    // Verify student roll no + phone before signup
-    verifyStudent: async (rollNo, phone) => {
+    // Verify student roll no before signup (no phone required)
+    verifyStudent: async (rollNo) => {
         try {
-            const { data } = await API.post('/auth/verify-student', { rollNo, phone });
+            const { data } = await API.post('/auth/verify-student', { rollNo });
             return { success: true, ...data };
         } catch (error) {
             return { success: false, error: error.response?.data?.message || 'Verification failed' };
@@ -71,9 +71,9 @@ export const ProjectService = {
     },
 
     // Register a new student account after verification
-    registerStudent: async (rollNo, phone, email, password, name) => {
+    registerStudent: async (rollNo, email, password, name) => {
         try {
-            const { data } = await API.post('/auth/register', { rollNo, phone, email, password, name });
+            const { data } = await API.post('/auth/register', { rollNo, email, password, name });
             return { success: true, user: normalize(data) };
         } catch (error) {
             return { success: false, error: error.response?.data?.message || 'Registration failed' };

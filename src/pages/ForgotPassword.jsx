@@ -10,7 +10,6 @@ import { ProjectService } from '../services/storage';
 const ForgotPassword = () => {
     // Step 1 state
     const [email, setEmail] = useState('');
-    const [mobile, setMobile] = useState('');
     const [step1Loading, setStep1Loading] = useState(false);
     const [step1Error, setStep1Error] = useState('');
 
@@ -27,20 +26,19 @@ const ForgotPassword = () => {
         e.preventDefault();
         setStep1Error('');
 
-        if (!email.trim() || !mobile.trim()) {
-            setStep1Error('Both email and phone number are required.');
+        if (!email.trim()) {
+            setStep1Error('Email is required.');
             return;
         }
 
         setStep1Loading(true);
-        const result = await ProjectService.forgotPassword(email.trim(), mobile.trim());
+        const result = await ProjectService.forgotPassword(email.trim());
         setStep1Loading(false);
 
         if (result.success) {
-            alert(`TEST OTP: ${result.otp}`); // Testing only
             setStep(2);
         } else {
-            setStep1Error(result.error || 'Verification failed. Please check your details.');
+            setStep1Error(result.error || 'Verification failed. Please check your email.');
         }
     };
 
@@ -127,7 +125,7 @@ const ForgotPassword = () => {
                     ) : step === 1 ? (
                         <>
                             <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-                                Enter your registered Email Address and Mobile Number to verify your identity.
+                                Enter your registered Email Address to receive an OTP.
                             </p>
                             {step1Error && (
                                 <div style={{
@@ -139,24 +137,20 @@ const ForgotPassword = () => {
                                 </div>
                             )}
                             <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                {[
-                                    { label: 'Registered Email', value: email, set: setEmail, placeholder: 'name@gmail.com', type: 'email' },
-                                    { label: 'Mobile Number', value: mobile, set: setMobile, placeholder: '10-digit mobile number', type: 'tel' },
-                                ].map(({ label, value, set, placeholder, type }) => (
-                                    <div key={label}>
-                                        <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-main)' }}>
-                                            {label}
-                                        </label>
-                                        <input
-                                            className="saas-input"
-                                            type={type}
-                                            value={value}
-                                            onChange={e => set(e.target.value)}
-                                            placeholder={placeholder}
-                                            required
-                                        />
-                                    </div>
-                                ))}
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-main)' }}>
+                                        Registered Email
+                                    </label>
+                                    <input
+                                        className="saas-input"
+                                        type="email"
+                                        value={email}
+                                        onChange={e => setEmail(e.target.value)}
+                                        placeholder="name@gmail.com"
+                                        required
+                                        autoFocus
+                                    />
+                                </div>
                                 <button
                                     type="submit"
                                     className="btn-primary"

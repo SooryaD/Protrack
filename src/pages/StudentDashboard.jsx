@@ -79,6 +79,11 @@ const ReviewScoreCard = ({ title, review, outOf = 20 }) => {
     );
 };
 
+const formatFileUrl = (path) => {
+    if (!path) return '';
+    return path.startsWith('http') ? path : `http://localhost:5000/${path}`;
+};
+
 const StudentDashboard = () => {
     const { user } = useAuth();
     const [proposals, setProposals] = useState([]);
@@ -292,7 +297,8 @@ const StudentDashboard = () => {
                                                 <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#EFF6FF', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 600 }}>{g.name?.charAt(0)}</div>
                                                 <div>
                                                     <h3 style={{ fontSize: '1.05rem', margin: '0 0 0.2rem 0' }}>{g.name}</h3>
-                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{g.email}</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600 }}>{g.designation || 'Staff'}</div>
+                                                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{g.email}</div>
                                                 </div>
                                             </div>
                                         </div>
@@ -351,7 +357,7 @@ const StudentDashboard = () => {
                             {templates.map(t => (
                                 <a
                                     key={t.id}
-                                    href={`http://localhost:5000/${t.file_path}`}
+                                    href={formatFileUrl(t.file_path)}
                                     target="_blank" rel="noopener noreferrer"
                                     style={{
                                         display: 'flex', alignItems: 'center', gap: '0.875rem',
@@ -608,45 +614,153 @@ const StudentDashboard = () => {
                         </div>
                     )}
 
-                    {/* REPOSITORY TAB */}
+                    {/* REPOSITORY TAB — Sequential Review Flow */}
                     {activeTab === 'repository' && (
                         <div className="saas-card animate-fade-in" style={{ padding: '2rem' }}>
-                            {!canUpload ? (
-                                <div style={{ textAlign: 'center', padding: '3rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                                    <AlertCircle size={32} color="var(--text-muted)" style={{ margin: '0 auto 1rem', display: 'block' }} />
-                                    <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>Repository Locked</h3>
-                                    <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Files can be uploaded after CSC approval and during review stages.</p>
+                        {(() => {
+
+                        const st = selectedProject.status;
+                        const repo = selectedProject.repository || {};
+
+                        // Determine which stage the student is currently in
+                        const inFirstReview = ['FIRST_REVIEW_PENDING'].includes(st);
+                        const inSecondReview = ['FIRST_REVIEW_DONE'].includes(st);
+                        const inFinalStage = ['SECOND_REVIEW_DONE', 'REPORT_CHANGES_REQUESTED'].includes(st);
+                        const locked = !canUpload;
+
+                        // Shared row style builder
+                        const UploadRow = ({ fileKey, label, desc, icon, bgColor, showRow, isUploaded, isPastStage }) => {
+                            if (!showRow) return null;
+                            return (
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    padding: '1.25rem',
+                                    border: `1px solid ${isPastStage ? '#BBF7D0' : 'var(--border-color)'}`,
+                                    borderRadius: 'var(--radius-md)',
+                                    background: isPastStage ? '#F0FDF4' : 'white',
+                                    transition: 'all 0.3s ease'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                        <div style={{ background: isPastStage ? '#DCFCE7' : bgColor, padding: '0.75rem', borderRadius: 'var(--radius-sm)' }}>{icon}</div>
+                                        <div>
+                                            <div style={{ fontWeight: 600, fontSize: '0.95rem', color: isPastStage ? '#15803D' : 'var(--text-main)' }}>{label}</div>
+                                            <div style={{ fontSize: '0.8rem', color: isPastStage ? '#16A34A' : 'var(--text-muted)' }}>{desc}</div>
+                                        </div>
+                                    </div>
+                                    {isUploaded
+                                        ? <span style={{ color: '#16A34A', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#DCFCE7', borderRadius: 'var(--radius-full)', border: '1px solid #86EFAC' }}>
+                                            <CheckCircle size={16} /> Uploaded
+                                          </span>
+                                        : <button onClick={() => handleFileUpload(fileKey)} disabled={isSubmitted || locked}
+                                            style={{ padding: '0.5rem 1.25rem', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 'var(--radius-sm)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>
+                                            Upload File
+                                          </button>
+                                    }
                                 </div>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                    {[
-                                        { key: 'firstReview', label: 'First Review Document (.pdf)', desc: 'Literature & Problem Definition', icon: <FileText size={20} color="var(--primary)" />, color: '#EFF6FF', ext: '.pdf' },
-                                        { key: 'secondReview', label: 'Second Review Document (.pdf)', desc: 'Design & Code Modules', icon: <FileText size={20} color="var(--primary)" />, color: '#EFF6FF', ext: '.pdf' },
-                                        { key: 'code', label: 'Source Code (.zip)', desc: 'Full project codebase', icon: <Code size={20} color="var(--primary)" />, color: '#EFF6FF', ext: '.zip' },
-                                        { key: 'report', label: 'Project Report (.pdf)', desc: 'Final documentation and thesis', icon: <FileText size={20} color="var(--danger)" />, color: '#FEE2E2', ext: '.pdf' },
-                                    ].map(({ key, label, desc, icon, color }) => (
-                                        <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                                <div style={{ background: color, padding: '0.75rem', borderRadius: 'var(--radius-sm)' }}>{icon}</div>
-                                                <div><div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{label}</div><div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{desc}</div></div>
+                            );
+                        };
+
+                        return (
+                            <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                {locked ? (
+                                    <div style={{ textAlign: 'center', padding: '3rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                                        <AlertCircle size={32} color="var(--text-muted)" style={{ margin: '0 auto 1rem', display: 'block' }} />
+                                        <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>Repository Locked</h3>
+                                        <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Files can be uploaded after CSC approval and during review stages.</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* ── STAGE HEADER ─────────────────────────────── */}
+                                        <div style={{ padding: '0.875rem 1.25rem', background: 'linear-gradient(135deg, #EFF6FF 0%, #F3E8FF 100%)', borderRadius: 'var(--radius-md)', border: '1px solid #BFDBFE', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                            <CalendarDays size={18} color="var(--primary)" />
+                                            <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--primary)' }}>
+                                                {inFirstReview && 'Stage 1 of 3 — Upload First Review Document'}
+                                                {inSecondReview && 'Stage 2 of 3 — Upload Second Review Document'}
+                                                {inFinalStage && 'Stage 3 of 3 — Upload Source Code & Final Report'}
+                                                {isSubmitted && '✅ All stages complete — Project Submitted'}
+                                                {!inFirstReview && !inSecondReview && !inFinalStage && !isSubmitted && 'Upload your project files'}
+                                            </span>
+                                        </div>
+
+                                        {/* ── FIRST REVIEW ─────────────────────────────── */}
+                                        <UploadRow
+                                            fileKey="firstReview"
+                                            label="First Review Document (.pdf)"
+                                            desc="Literature & Problem Definition"
+                                            icon={<FileText size={20} color={repo.firstReview ? '#16A34A' : 'var(--primary)'} />}
+                                            bgColor="#EFF6FF"
+                                            showRow={inFirstReview || inSecondReview || inFinalStage || isSubmitted || repo.firstReview}
+                                            isUploaded={!!repo.firstReview}
+                                            isPastStage={!inFirstReview && !!repo.firstReview}
+                                        />
+
+                                        {/* Arrow connector between stages */}
+                                        {(inSecondReview || inFinalStage || isSubmitted) && repo.firstReview && (
+                                            <div style={{ display: 'flex', justifyContent: 'center', color: '#22C55E', fontSize: '1.2rem' }}>↓</div>
+                                        )}
+
+                                        {/* ── SECOND REVIEW ────────────────────────────── */}
+                                        <UploadRow
+                                            fileKey="secondReview"
+                                            label="Second Review Document (.pdf)"
+                                            desc="Design & Code Modules"
+                                            icon={<FileText size={20} color={repo.secondReview ? '#16A34A' : 'var(--primary)'} />}
+                                            bgColor="#EFF6FF"
+                                            showRow={inSecondReview || inFinalStage || isSubmitted || repo.secondReview}
+                                            isUploaded={!!repo.secondReview}
+                                            isPastStage={!inSecondReview && !!repo.secondReview}
+                                        />
+
+                                        {/* Arrow connector */}
+                                        {(inFinalStage || isSubmitted) && repo.secondReview && (
+                                            <div style={{ display: 'flex', justifyContent: 'center', color: '#22C55E', fontSize: '1.2rem' }}>↓</div>
+                                        )}
+
+                                        {/* ── CODE + REPORT (Final Stage) ──────────────── */}
+                                        <UploadRow
+                                            fileKey="code"
+                                            label="Source Code (.zip)"
+                                            desc="Full project codebase"
+                                            icon={<Code size={20} color={repo.code ? '#16A34A' : 'var(--primary)'} />}
+                                            bgColor="#EFF6FF"
+                                            showRow={inFinalStage || isSubmitted || repo.code}
+                                            isUploaded={!!repo.code}
+                                            isPastStage={isSubmitted && !!repo.code}
+                                        />
+                                        <UploadRow
+                                            fileKey="report"
+                                            label="Project Report (.pdf)"
+                                            desc="Final documentation and thesis"
+                                            icon={<FileText size={20} color={repo.report ? '#16A34A' : '#EF4444'} />}
+                                            bgColor="#FEE2E2"
+                                            showRow={inFinalStage || isSubmitted || repo.report}
+                                            isUploaded={!!repo.report}
+                                            isPastStage={isSubmitted && !!repo.report}
+                                        />
+
+                                        {/* ── FINAL SUBMIT BUTTON ───────────────────────── */}
+                                        {!isSubmitted && repo.code && repo.report && inFinalStage && (
+                                            <div style={{ marginTop: '0.5rem', padding: '1.5rem', background: '#F8FAFC', borderRadius: 'var(--radius-md)', textAlign: 'center', border: '1px solid var(--border-color)' }}>
+                                                <h4 style={{ marginBottom: '0.5rem' }}>Ready for Final Submission</h4>
+                                                <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>Both files uploaded. Submit for Viva-Voce examination.</p>
+                                                <button onClick={handleSubmitForReview} className="btn-primary" style={{ padding: '0.875rem 2.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <Send size={16} /> Submit Final Report
+                                                </button>
                                             </div>
-                                            {selectedProject.repository?.[key]
-                                                ? <span style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontWeight: 500, padding: '0.5rem 0.75rem', background: '#DCFCE7', borderRadius: 'var(--radius-sm)' }}><CheckCircle size={16} /> Uploaded</span>
-                                                : <button onClick={() => handleFileUpload(key)} disabled={isSubmitted} style={{ padding: '0.5rem 1rem', background: '#F1F5F9', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', fontWeight: 500, fontSize: '0.85rem' }}>Upload File</button>
-                                            }
-                                        </div>
-                                    ))}
-                                    {!isSubmitted && selectedProject.repository?.code && selectedProject.repository?.report && ['SECOND_REVIEW_DONE', 'REPORT_CHANGES_REQUESTED'].includes(selectedProject.status) && (
-                                        <div style={{ marginTop: '1rem', padding: '1.5rem', background: '#F8FAFC', borderRadius: 'var(--radius-md)', textAlign: 'center', border: '1px solid var(--border-color)' }}>
-                                            <h4 style={{ marginBottom: '0.5rem' }}>Ready for Final Submission</h4>
-                                            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>Both files uploaded. Submit for Viva-Voce examination.</p>
-                                            <button onClick={handleSubmitForReview} className="btn-primary" style={{ padding: '0.875rem 2.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <Send size={16} /> Submit Final Report
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                                        )}
+
+                                        {/* ── FIRST REVIEW PENDING — prompt message ─────── */}
+                                        {inFirstReview && !repo.firstReview && (
+                                            <div style={{ padding: '1rem 1.25rem', background: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: 'var(--radius-md)', fontSize: '0.875rem', color: '#92400E', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                <AlertCircle size={16} color="#F97316" />
+                                                Upload your First Review document to proceed to the next stage.
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        );
+                        })()} 
                         </div>
                     )}
                 </div>

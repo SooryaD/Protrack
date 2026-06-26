@@ -5,6 +5,11 @@ import { Users, BarChart2, Trash2, Plus, Briefcase, Activity, Clock, CheckCircle
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'student', assignedGuideId: '', assignedGuideName: '' };
 
+const formatFileUrl = (path) => {
+    if (!path) return '';
+    return path.startsWith('http') ? path : `http://localhost:5000/${path}`;
+};
+
 const AdminDashboard = () => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('stats');
@@ -459,11 +464,11 @@ const AdminDashboard = () => {
                                     </div>
                                     {p.repository && (
                                         <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.75rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-                                            {p.repository.abstract && <a href={`http://localhost:5000/${p.repository.abstract}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.2rem 0.4rem', background: '#EFF6FF', borderRadius: '4px' }}><FileText size={12} /> Abstract</a>}
-                                            {p.repository.firstReview && <a href={`http://localhost:5000/${p.repository.firstReview}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.2rem 0.4rem', background: '#EFF6FF', borderRadius: '4px' }}><FileText size={12} /> R1 Doc</a>}
-                                            {p.repository.secondReview && <a href={`http://localhost:5000/${p.repository.secondReview}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.2rem 0.4rem', background: '#EFF6FF', borderRadius: '4px' }}><FileText size={12} /> R2 Doc</a>}
-                                            {p.repository.code && <a href={`http://localhost:5000/${p.repository.code}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--text-main)', textDecoration: 'none', padding: '0.2rem 0.4rem', background: '#F1F5F9', border: '1px solid var(--border-color)', borderRadius: '4px' }}><Code size={12} /> Code</a>}
-                                            {p.repository.report && <a href={`http://localhost:5000/${p.repository.report}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--danger)', textDecoration: 'none', padding: '0.2rem 0.4rem', background: '#FEE2E2', borderRadius: '4px' }}><FileText size={12} /> Final Report</a>}
+                                            {p.repository.abstract && <a href={formatFileUrl(p.repository.abstract)} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.2rem 0.4rem', background: '#EFF6FF', borderRadius: '4px' }}><FileText size={12} /> Abstract</a>}
+                                            {p.repository.firstReview && <a href={formatFileUrl(p.repository.firstReview)} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.2rem 0.4rem', background: '#EFF6FF', borderRadius: '4px' }}><FileText size={12} /> R1 Doc</a>}
+                                            {p.repository.secondReview && <a href={formatFileUrl(p.repository.secondReview)} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.2rem 0.4rem', background: '#EFF6FF', borderRadius: '4px' }}><FileText size={12} /> R2 Doc</a>}
+                                            {p.repository.code && <a href={formatFileUrl(p.repository.code)} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--text-main)', textDecoration: 'none', padding: '0.2rem 0.4rem', background: '#F1F5F9', border: '1px solid var(--border-color)', borderRadius: '4px' }}><Code size={12} /> Code</a>}
+                                            {p.repository.report && <a href={formatFileUrl(p.repository.report)} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--danger)', textDecoration: 'none', padding: '0.2rem 0.4rem', background: '#FEE2E2', borderRadius: '4px' }}><FileText size={12} /> Final Report</a>}
                                         </div>
                                     )}
                                 </div>
@@ -563,7 +568,7 @@ const AdminDashboard = () => {
                                         
                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                                             <a 
-                                                href={`http://localhost:5000/${t.file_path}`} 
+                                                href={formatFileUrl(t.file_path)} 
                                                 target="_blank" rel="noopener noreferrer" 
                                                 style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.75rem', fontSize: '0.8rem', fontWeight: 500, background: '#EFF6FF', color: 'var(--primary)', textDecoration: 'none', borderRadius: 'var(--radius-sm)', transition: 'var(--transition)' }}
                                             >

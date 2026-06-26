@@ -4,6 +4,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import connectDB from './db.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Route Imports
 import authRoutes from './routes/auth.js';
@@ -11,6 +13,9 @@ import userRoutes from './routes/users.js';
 import projectRoutes from './routes/projects.js';
 import guideRequestRoutes from './routes/guideRequests.js';
 import templateRoutes from './routes/templates.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -49,10 +54,13 @@ app.use(cors({
 // Body parser
 app.use(express.json());
 
-// Rate limiting — auth routes (20 requests per 15 min per IP)
+// Serve static uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Rate limiting — auth routes (1000 requests per 15 min per IP for dev)
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 20,
+    max: 1000,
     standardHeaders: true,
     legacyHeaders: false,
     message: { message: 'Too many requests. Please try again later.' }

@@ -13,6 +13,11 @@ const FIRST_REVIEW_CRITERIA = [
     { key: 'guideMarks', label: 'Guide Marks', max: 30 },
 ];
 
+const formatFileUrl = (path) => {
+    if (!path) return '';
+    return path.startsWith('http') ? path : `http://localhost:5000/${path}`;
+};
+
 // ─── Second Review criteria (max 100 → normalized to 20) ────────
 const SECOND_REVIEW_CRITERIA = [
     { key: 'systemDesign', label: 'System Design', max: 10 },
@@ -277,11 +282,11 @@ const StaffDashboard = () => {
                                                 {/* File links for review */}
                                                 {p.repository && (
                                                     <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.78rem', flexWrap: 'wrap' }}>
-                                                        {p.repository.abstract && <a href={`http://localhost:5000/${p.repository.abstract}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#EFF6FF', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> Abstract</a>}
-                                                        {p.repository.firstReview && <a href={`http://localhost:5000/${p.repository.firstReview}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#EFF6FF', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> R1 Doc</a>}
-                                                        {p.repository.secondReview && <a href={`http://localhost:5000/${p.repository.secondReview}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#EFF6FF', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> R2 Doc</a>}
-                                                        {p.repository.code && <a href={`http://localhost:5000/${p.repository.code}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#EFF6FF', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> Code</a>}
-                                                        {p.repository.report && <a href={`http://localhost:5000/${p.repository.report}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--danger)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#FEE2E2', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> Report</a>}
+                                                        {p.repository.abstract && <a href={formatFileUrl(p.repository.abstract)} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#EFF6FF', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> Abstract</a>}
+                                                        {p.repository.firstReview && <a href={formatFileUrl(p.repository.firstReview)} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#EFF6FF', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> R1 Doc</a>}
+                                                        {p.repository.secondReview && <a href={formatFileUrl(p.repository.secondReview)} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#EFF6FF', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> R2 Doc</a>}
+                                                        {p.repository.code && <a href={formatFileUrl(p.repository.code)} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--primary)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#EFF6FF', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> Code</a>}
+                                                        {p.repository.report && <a href={formatFileUrl(p.repository.report)} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--danger)', textDecoration: 'none', padding: '0.25rem 0.5rem', background: '#FEE2E2', borderRadius: 'var(--radius-sm)' }}><FileText size={12} /> Report</a>}
                                                     </div>
                                                 )}
 

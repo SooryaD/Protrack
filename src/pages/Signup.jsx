@@ -8,10 +8,9 @@ const Signup = () => {
     const navigate = useNavigate();
     const { login } = useAuth();
 
-    // Step 1: Verify roll no + phone
+    // Step 1: Verify roll no
     const [step, setStep] = useState(1);
     const [rollNo, setRollNo] = useState('');
-    const [phone, setPhone] = useState('');
     const [verifiedName, setVerifiedName] = useState('');
     const [verifiedGuide, setVerifiedGuide] = useState('');
 
@@ -29,10 +28,9 @@ const Signup = () => {
         setError('');
 
         if (!rollNo.trim()) { setError('Please enter your Roll Number.'); return; }
-        if (!phone.trim() || phone.trim().length < 10) { setError('Please enter a valid 10-digit phone number.'); return; }
 
         setLoading(true);
-        const result = await ProjectService.verifyStudent(rollNo.trim().toUpperCase(), phone.trim());
+        const result = await ProjectService.verifyStudent(rollNo.trim().toUpperCase());
         setLoading(false);
 
         if (result.success) {
@@ -56,7 +54,6 @@ const Signup = () => {
         setLoading(true);
         const result = await ProjectService.registerStudent(
             rollNo.trim().toUpperCase(),
-            phone.trim(),
             email.trim().toLowerCase(),
             password,
             verifiedName
@@ -141,14 +138,14 @@ const Signup = () => {
                         </div>
                     )}
 
-                    {/* ── STEP 1: Verify Roll No + Phone ── */}
+                    {/* ── STEP 1: Verify Roll No ── */}
                     {step === 1 && (
                         <>
                             <h2 style={{ marginBottom: '0.4rem', fontSize: '1.2rem', fontWeight: 600, color: 'var(--text-main)' }}>
                                 Verify Your Identity
                             </h2>
                             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.75rem' }}>
-                                Enter your college-assigned <strong>Roll Number</strong> and your <strong>registered phone number</strong> to continue.
+                                Enter your college-assigned <strong>Roll Number</strong> to continue.
                             </p>
 
                             <form onSubmit={handleVerify} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
@@ -162,24 +159,9 @@ const Signup = () => {
                                         type="text"
                                         value={rollNo}
                                         onChange={e => { setRollNo(e.target.value.toUpperCase()); setError(''); }}
-                                        placeholder="e.g. 26MCA0001"
+                                        placeholder="e.g. 2435MCA0001"
                                         autoFocus
                                         autoComplete="off"
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-main)' }}>
-                                        Registered Phone Number
-                                    </label>
-                                    <input
-                                        className="saas-input"
-                                        id="phone"
-                                        type="tel"
-                                        value={phone}
-                                        onChange={e => { setPhone(e.target.value); setError(''); }}
-                                        placeholder="10-digit mobile number"
-                                        maxLength={10}
-                                        autoComplete="tel"
                                     />
                                 </div>
                                 <button
